@@ -1,0 +1,11 @@
+version: "3"
+services:
+  prod:
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+    container_name: motya-gpt-bot
+    ports:
+      - "3306:3306"
+    volumes:
+      - /etc/localtime:/etc/localtime
