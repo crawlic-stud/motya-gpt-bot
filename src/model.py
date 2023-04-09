@@ -9,9 +9,7 @@ from pathlib import Path
 import random
 
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("main")
-load_dotenv()
+logger = logging.getLogger("model")
 
 
 class MotyaModel:
@@ -37,7 +35,8 @@ class MotyaModel:
         return inspirations.split(",")
 
     def reset_model(self, prompt_path, model_name: str = "mindsdb.motya_model") -> None:
-        prompt = Path(prompt_path).read_text(encoding="utf-8")
+        path = Path.cwd() / prompt_path
+        prompt = path.read_text(encoding="utf-8")
         
         try:
             self.cursor.execute(f"DROP TABLE {model_name}")
@@ -58,11 +57,23 @@ class MotyaModel:
         except DatabaseError as e:
             logger.error("Creation failed:", e)
 
+    def get_random_theme(self, themes_path: str = "prompts/inspirations.txt"):
+        text = Path(themes_path).read_text(encoding="utf-8")
+        themes = text.split("\n")
+        return random.choice(themes)
+
+    def create_random_post(self):
+        theme = self.get_random_theme()
+        inspiration = random.choice(self.get_inspiration(theme)).strip()
+        logger.info(f"GENERATING POST: {inspiration}")
+        return self.answer(f"напиши короткий пост про: {inspiration}")
+
 
 if __name__ == "__main__":
     motya = MotyaModel()
-    motya.reset_model("motya_prompt.txt", "mindsdb.motya_model")
-    motya.reset_model("helper_prompt.txt", "mindsdb.motya_helper")
-    inspiration = random.choice(motya.get_inspiration("программирование")).strip()
-    print(inspiration)
-    print(motya.answer(f"напиши короткий пост про: {inspiration}"))
+    # motya.reset_model("prompts/motya_prompt.txt", "mindsdb.motya_model")
+    # motya.reset_model("prompts/helper_prompt.txt", "mindsdb.motya_helper")
+    # inspiration = random.choice(motya.get_inspiration("программирование")).strip()
+    # print(motya.get_inspiration("темы"))
+    # print(motya.answer(f"напиши короткий пост про: {inspiration}"))
+    print(motya.create_random_post())

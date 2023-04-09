@@ -1,3 +1,5 @@
 python-dotenv
 retry
 mysql-connector-python
+aiogram
+aioschedule
