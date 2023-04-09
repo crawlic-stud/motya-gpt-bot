@@ -1,11 +1,12 @@
 import logging
 
 from aiogram import executor
-from dotenv import load_dotenv
+from dotenv import load_dotenv, dotenv_values
 
 
 if __name__ == "__main__":
     load_dotenv()
+    print(dotenv_values())
     logging.basicConfig(level=logging.INFO)
 
     from model import MotyaModel
