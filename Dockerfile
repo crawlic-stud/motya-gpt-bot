@@ -1,6 +1,6 @@
 FROM python:3.10.8
 
-ADD main.py .
+ADD src/main.py .
 
 COPY requirements.txt /tmp/requirements.txt
 COPY . .
