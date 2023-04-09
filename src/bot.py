@@ -7,20 +7,24 @@ from aiogram.dispatcher.filters import ChatTypeFilter, IsReplyFilter, IDFilter
 import aioschedule
 
 from model import MotyaModel
+from mongo import ConfigDb
 
 
 TOKEN = os.getenv("TG_TOKEN")
+MONGO_URL = os.getenv("MONGO_URL")
 bot = Bot(TOKEN, parse_mode="HTML")
 dp = Dispatcher(bot, storage=MemoryStorage())
+config_db = ConfigDb(MONGO_URL, "motya_gpt", "config")
 
 
 async def send_post(model: MotyaModel):
     group = "@motya_blog"
-    await bot.send_message(group, model.create_random_post())
+    themes = config_db.get_themes()
+    await bot.send_message(group, model.create_random_post(themes))
 
 
 async def posts_loop(model: MotyaModel):
-    for time in ["8:10", "11:50", "14:05", "17:30"]:
+    for time in ["8:10", "11:50", "14:05", "16:30", "19:05"]:
         aioschedule.every().day.at(time).do(send_post, model)
     while True:
         await aioschedule.run_pending()
@@ -28,8 +32,6 @@ async def posts_loop(model: MotyaModel):
 
 
 async def on_startup(model: MotyaModel, dp: Dispatcher):
-    # await bot.send_message("@motya_blog", 
-    # model.answer("напиши пост в котором ты приветствуешь подписчиков и рассказываешь им о том, что будет в этом блоге"))
     asyncio.create_task(posts_loop(model))
 
 
