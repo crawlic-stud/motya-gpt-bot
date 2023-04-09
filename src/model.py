@@ -62,7 +62,7 @@ class MotyaModel:
 
 if __name__ == "__main__":
     motya = MotyaModel()
-    inspiration = random.choice(motya.get_inspiration("программирование")).strip()
-    print(motya.get_inspiration("темы"))
-    print(motya.answer(f"напиши короткий пост про: {inspiration}"))
-    # print(motya.create_random_post())
+    # inspiration = random.choice(motya.get_inspiration("программирование")).strip()
+    # print(motya.get_inspiration("темы"))
+    # print(motya.answer(f"напиши короткий пост про: {inspiration}"))
+    print(motya.create_random_post())

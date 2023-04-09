@@ -11,9 +11,9 @@ from mongo import ConfigDb
 
 
 TOKEN = os.getenv("TG_TOKEN")
-MONGO_URL = os.getenv("MONGO_URL")
 bot = Bot(TOKEN, parse_mode="HTML")
 dp = Dispatcher(bot, storage=MemoryStorage())
+MONGO_URL = os.getenv("MONGO_URL")
 config_db = ConfigDb(MONGO_URL, "motya_gpt", "config")
 
 
