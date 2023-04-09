@@ -24,7 +24,7 @@ async def send_post(model: MotyaModel):
 
 
 async def posts_loop(model: MotyaModel):
-    for time in ["8:10", "11:50", "14:05", "16:30", "19:05"]:
+    for time in ["8:10", "11:50", "14:05", "16:45", "19:05"]:
         aioschedule.every().day.at(time).do(send_post, model)
     while True:
         await aioschedule.run_pending()
