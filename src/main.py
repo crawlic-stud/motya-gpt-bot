@@ -1,7 +1,7 @@
 import logging
 
 from aiogram import executor
-from dotenv import load_dotenv, dotenv_values
+from dotenv import load_dotenv
 
 
 if __name__ == "__main__":
