@@ -65,4 +65,4 @@ if __name__ == "__main__":
     # inspiration = random.choice(motya.get_inspiration("программирование")).strip()
     # print(motya.get_inspiration("темы"))
     # print(motya.answer(f"напиши короткий пост про: {inspiration}"))
-    print(motya.create_random_post())
+    print(motya.create_random_post(["пистолеты"]))
