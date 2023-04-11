@@ -10,7 +10,7 @@ async def main():
     from model_middleware import ModelMiddleware
     from bot import dp, on_startup
 
-    motya = AsyncMotyaModel.create()
+    motya = await AsyncMotyaModel.create()
     dp.middleware.setup(ModelMiddleware(motya))
     executor.start_polling(
         dispatcher=dp,
