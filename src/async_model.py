@@ -9,8 +9,6 @@ import random
 import asyncio
 from dataclasses import dataclass
 
-from image_gen import ImageGenerator
-
 
 logger = logging.getLogger("model")
 MAX_FAILS = 10
@@ -36,17 +34,15 @@ class AsyncMotyaModel:
     """Class to connect to my Mindsdb model"""
     def __init__(self) -> None:
         self.pool: _PoolContextManager | None = None
-        self.image_gen: ImageGenerator | None = None
 
     @classmethod
-    async def create(cls, image_gen: ImageGenerator | None = None):
+    async def create(cls):
         instance = cls()
         instance.pool = await aiomysql.create_pool(
             host="cloud.mindsdb.com",
             user=os.getenv("USER"),
             password=os.getenv("PASSWORD"),
         )
-        instance.image_gen = image_gen
         return instance
     
     def __del__(self):
@@ -125,7 +121,6 @@ class AsyncMotyaModel:
 
 
 async def main():
-    image_gen = ImageGenerator()
     motya = await AsyncMotyaModel.create()
     print(await motya.create_random_post(["игрушки"]))
 
