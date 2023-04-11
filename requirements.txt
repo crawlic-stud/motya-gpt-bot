@@ -1,8 +1,9 @@
 python-dotenv
 retry
+aiomysql
 aiogram
 aioschedule
 pymongo
 pymongo[srv]
 pytest
-aiomysql
+pytest-asyncio
