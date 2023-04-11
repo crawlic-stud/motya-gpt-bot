@@ -30,7 +30,7 @@ def retry_policy(info: RetryInfo):
 class Post:
     text: str
     images: list[str]
-
+    
 
 class AsyncMotyaModel:
     """Class to connect to my Mindsdb model"""
