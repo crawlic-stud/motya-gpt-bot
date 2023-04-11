@@ -1,24 +1,25 @@
 import logging
-import os
+import asyncio
 
 from aiogram import executor
 from dotenv import load_dotenv
 
 
-if __name__ == "__main__":
-    load_dotenv()
-    # print(dotenv_values())
-    logging.basicConfig(level=logging.INFO)
-
-    from model import MotyaModel
+async def main():
+    from async_model import AsyncMotyaModel
     from model_middleware import ModelMiddleware
     from bot import dp, on_startup
 
-    motya = MotyaModel()
+    motya = AsyncMotyaModel.create()
     dp.middleware.setup(ModelMiddleware(motya))
-    # os.system("pytest src/test.py")
     executor.start_polling(
         dispatcher=dp,
         on_startup=lambda dp: on_startup(motya, dp),
         skip_updates=True
     )
+
+
+if __name__ == "__main__":
+    load_dotenv()
+    logging.basicConfig(level=logging.INFO)
+    asyncio.run(main())

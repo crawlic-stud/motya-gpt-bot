@@ -2,11 +2,11 @@ from aiogram.dispatcher.handler import ctx_data
 from aiogram import types
 from aiogram.dispatcher.middlewares import BaseMiddleware
 
-from model import MotyaModel
+from async_model import AsyncMotyaModel
 
 
 class ModelMiddleware(BaseMiddleware):
-    def __init__(self, model: MotyaModel) -> None:
+    def __init__(self, model: AsyncMotyaModel) -> None:
         super().__init__()
         self.model = model
 
