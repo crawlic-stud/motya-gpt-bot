@@ -7,40 +7,35 @@ import logging
 import os
 import random
 import asyncio
+from dataclasses import dataclass
+
+from image_gen import ImageGenerator
 
 
 logger = logging.getLogger("model")
 
 
-async def test_example():
-    pool = await aiomysql.create_pool(
-        host="cloud.mindsdb.com",
-        user=os.getenv("USER"),
-        password=os.getenv("PASSWORD"),
-    )
-    async with pool.acquire() as conn:
-        async with conn.cursor() as cur:
-            await cur.execute("SELECT 42;")
-            print(cur.description)
-            (r,) = await cur.fetchone()
-            assert r == 42
-    pool.close()
-    await pool.wait_closed()
+@dataclass
+class Post:
+    text: str
+    images: list[str]
 
 
 class AsyncMotyaModel:
     """Class to connect to my Mindsdb model"""
     def __init__(self) -> None:
         self.pool: _PoolContextManager | None = None
+        self.image_gen: ImageGenerator | None = None
 
     @classmethod
-    async def create(cls):
+    async def create(cls, image_gen: ImageGenerator | None = None):
         instance = cls()
         instance.pool = await aiomysql.create_pool(
             host="cloud.mindsdb.com",
             user=os.getenv("USER"),
             password=os.getenv("PASSWORD"),
         )
+        instance.image_gen = image_gen
         return instance
     
     def __del__(self):
@@ -59,9 +54,14 @@ class AsyncMotyaModel:
         result = await self._execute(f'SELECT response from {model_name} WHERE text="{text}";')
         return result[0]
 
-    async def get_inspiration(self, theme: str) -> str:
+    async def get_inspirations(self, theme: str) -> list[str]:
         inspirations = await self.answer(theme, "mindsdb.motya_helper")
         return inspirations.split(",")
+
+    async def get_random_inspiration(self, themes: list[str]) -> str:
+        theme = random.choice(themes)
+        inspiration = random.choice(await self.get_inspirations(theme)).strip()
+        return inspiration
 
     async def reset_model(self, prompt, model_name: str = "mindsdb.motya_model") -> None:
         try:
@@ -86,21 +86,37 @@ class AsyncMotyaModel:
             logger.error("Creation failed:", e)
 
     async def create_random_post(self, themes: list[str]) -> str:
-        theme = random.choice(themes)
-        inspiration = random.choice(await self.get_inspiration(theme)).strip()
+        inspiration = await self.get_random_inspiration(themes)
         logger.info(f"GENERATING POST: {inspiration}")
         return await self.answer(f"напиши короткий пост про: {inspiration}")
 
+    async def create_random_post_with_images(self, themes: list[str], images_amount: int) -> Post:
+        inspiration = await self.get_random_inspiration(themes)
+        logger.info(f"GENERATING POST WITH IMAGES: {inspiration}")
+        text = await self.answer(f"напиши короткий пост про: {inspiration}")
+        if self.image_gen is None:
+            return Post(text, [])
+
+        inspiration_for_image = await self.answer(
+            f"Какие картинки могут подойти к посту на тему: {inspiration}. "
+            f"Напиши через запятую, без нумерации и лишнего текста. Делай максимально подробное описание картинок. " 
+            f"Напиши на английском языке."
+        )
+        inspiration_for_image = random.choice(inspiration_for_image.split(",")).strip()
+        logger.info(f"GENERATING IMAGE: {inspiration_for_image}")
+        images = self.image_gen.get_images(inspiration_for_image, images_amount)
+        
+        return Post(text, images)
+
 
 async def main():
-    motya = await AsyncMotyaModel.create()
-    print(await motya.create_random_post(["love"]))
+    image_gen = ImageGenerator()
+    motya = await AsyncMotyaModel.create(image_gen)
+    # print(await motya.create_random_post_with_images(["детский труд"], 4))
 
 
 if __name__ == "__main__":
     from dotenv import load_dotenv
     load_dotenv()
     logging.basicConfig(level=logging.INFO)
-    # loop = asyncio.get_event_loop()
-    # loop.run_until_complete(test_example(loop))
     asyncio.run(main())
