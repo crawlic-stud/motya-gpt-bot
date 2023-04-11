@@ -1,7 +1,7 @@
 import aiomysql
 from aiomysql.utils import _PoolContextManager
 from pymysql.err import ProgrammingError
-from retry import retry
+from aioretry import retry, RetryInfo
 
 import logging
 import os
@@ -10,22 +10,17 @@ import asyncio
 
 
 logger = logging.getLogger("model")
+MAX_FAILS = 10
 
 
-async def test_example():
-    pool = await aiomysql.create_pool(
-        host="cloud.mindsdb.com",
-        user=os.getenv("USER"),
-        password=os.getenv("PASSWORD"),
-    )
-    async with pool.acquire() as conn:
-        async with conn.cursor() as cur:
-            await cur.execute("SELECT 42;")
-            print(cur.description)
-            (r,) = await cur.fetchone()
-            assert r == 42
-    pool.close()
-    await pool.wait_closed()
+def retry_policy(info: RetryInfo):
+    exc = info.exception
+    logger.warning(f"Retrying because of: {exc.__class__}. Total tries = {info.fails}")
+    if isinstance(exc, ProgrammingError):
+        return info.fails >= MAX_FAILS, 5000
+    elif isinstance(exc, IndexError):
+        return info.fails >= MAX_FAILS, 0
+    return True, 0
 
 
 class AsyncMotyaModel:
@@ -53,8 +48,7 @@ class AsyncMotyaModel:
                 result = await cur.fetchone() or tuple()
                 return result
 
-    @retry(ProgrammingError, tries=2, delay=10, logger=logger)
-    @retry(IndexError, tries=5, logger=logger)
+    @retry(retry_policy=retry_policy)
     async def answer(self, text: str, model_name: str = "mindsdb.motya_model") -> str:
         result = await self._execute(f'SELECT response from {model_name} WHERE text="{text}";')
         return result[0]
