@@ -1,6 +1,6 @@
 import aiomysql
-from aiomysql.utils import _ConnectionContextManager
-from mysql.connector.errors import DatabaseError
+from aiomysql.utils import _PoolContextManager
+from pymysql.err import ProgrammingError
 from retry import retry
 
 import logging
@@ -12,13 +12,11 @@ import asyncio
 logger = logging.getLogger("model")
 
 
-async def test_example(loop):
+async def test_example():
     pool = await aiomysql.create_pool(
         host="cloud.mindsdb.com",
         user=os.getenv("USER"),
         password=os.getenv("PASSWORD"),
-        port="3306",
-        loop=loop
     )
     async with pool.acquire() as conn:
         async with conn.cursor() as cur:
@@ -30,33 +28,35 @@ async def test_example(loop):
     await pool.wait_closed()
 
 
-class MotyaModel:
+class AsyncMotyaModel:
     """Class to connect to my Mindsdb model"""
     def __init__(self) -> None:
-        self.connection: _ConnectionContextManager | None = None 
-        self.cursor = None 
+        self.pool: _PoolContextManager | None = None
 
     @classmethod
     async def create(cls):
-        conn = await aiomysql.connection.connect(
+        instance = cls()
+        instance.pool = await aiomysql.create_pool(
             host="cloud.mindsdb.com",
             user=os.getenv("USER"),
             password=os.getenv("PASSWORD"),
-            port="3306"
         )
-        instance = cls()
-        instance.connection = conn
-        instance.cursor = await conn.cursor
         return instance
     
     def __del__(self):
-        self.connection.close()
+        self.pool.close()
 
-    @retry(DatabaseError, tries=2, delay=10, logger=logger)
+    async def _execute(self, command: str) -> tuple[str]:
+        async with self.pool.acquire() as conn:
+            async with conn.cursor() as cur:
+                await cur.execute(command)
+                result = await cur.fetchone() or tuple()
+                return result
+
+    @retry(ProgrammingError, tries=2, delay=10, logger=logger)
     @retry(IndexError, tries=5, logger=logger)
     async def answer(self, text: str, model_name: str = "mindsdb.motya_model") -> str:
-        await self.cursor.execute(f'SELECT response from {model_name} WHERE text="{text}";')
-        result = await self.cursor.fetchone() or []
+        result = await self._execute(f'SELECT response from {model_name} WHERE text="{text}";')
         return result[0]
 
     async def get_inspiration(self, theme: str) -> str:
@@ -65,12 +65,13 @@ class MotyaModel:
 
     async def reset_model(self, prompt, model_name: str = "mindsdb.motya_model") -> None:
         try:
-            await self.cursor.execute(f"DROP TABLE {model_name}")
-        except DatabaseError as e:
+            await self._execute(f"DROP TABLE {model_name}")
+            logger.info(f"Dropped table: {model_name}")
+        except ProgrammingError as e:
             logger.error("Deletion failed:", e)
         
         try:
-            await self.cursor.execute(f"""
+            await self._execute(f"""
                 CREATE MODEL {model_name}
                 PREDICT response
                 USING
@@ -80,21 +81,29 @@ class MotyaModel:
                 prompt_template = 'From input message: {{{{text}}}}\
                 {prompt}';""".strip()
             )
-        except DatabaseError as e:
+            logger.info(f"Created table: {model_name}")
+        except ProgrammingError as e:
             logger.error("Creation failed:", e)
 
     async def create_random_post(self, themes: list[str]) -> str:
         theme = random.choice(themes)
-        inspiration = random.choice(self.get_inspiration(theme)).strip()
+        inspiration = random.choice(await self.get_inspiration(theme)).strip()
         logger.info(f"GENERATING POST: {inspiration}")
         return await self.answer(f"напиши короткий пост про: {inspiration}")
 
 
 async def main():
-    motya = await MotyaModel.create()
-    print(motya.create_random_post())
-
+    motya = await AsyncMotyaModel.create()
+    await motya.reset_model("""
+Пиши от лица тушканчика по имени Мотя, он еще совсем маленький и только познает этот мир, поэтому ведет себя как ребенок. Старайся ответить на вопросы кратко и четко, иногда можешь писать всякую чушь, бред и отвечать неправильно. Пиши так, будто общаешься со своими подписчиками, но при этом будь милым и дружелюбным.При ответе на вопрос не нужно представляться. Используй в своих ответах эмодзи, которые подходят по смыслу к словам, которые ты пишешь. Пиши с маленькой буквы и иногда совершай ошибки.
+    """)
+    print(await motya.create_random_post(["love"]))
 
 
 if __name__ == "__main__":
-    asyncio.run(test_example(asyncio.get_event_loop()))
+    from dotenv import load_dotenv
+    load_dotenv()
+    logging.basicConfig(level=logging.INFO)
+    # loop = asyncio.get_event_loop()
+    # loop.run_until_complete(test_example(loop))
+    asyncio.run(main())
