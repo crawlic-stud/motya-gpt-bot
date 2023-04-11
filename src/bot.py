@@ -7,6 +7,7 @@ from aiogram.dispatcher.filters import ChatTypeFilter, IsReplyFilter, IDFilter
 import aioschedule
 
 from async_model import AsyncMotyaModel
+from model_middleware import ModelMiddleware
 from mongo import ConfigDb
 
 
@@ -31,8 +32,10 @@ async def posts_loop(model: AsyncMotyaModel):
         await asyncio.sleep(1)
 
 
-async def on_startup(model: AsyncMotyaModel, dp: Dispatcher):
-    asyncio.create_task(posts_loop(model))
+async def on_startup(dp: Dispatcher):
+    motya = await AsyncMotyaModel.create()
+    dp.middleware.setup(ModelMiddleware(motya))
+    asyncio.create_task(posts_loop(motya))
 
 
 @dp.message_handler(commands=["start"])
