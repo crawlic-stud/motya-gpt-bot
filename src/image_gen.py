@@ -10,19 +10,21 @@ class ImageGenerator:
     def __init__(self) -> None:
         self.client = replicate.Client(api_token=os.getenv("REPLICATE_KEY"))
 
-    def get_images(self, prompt: str, amount: int = 1) -> list[str]:
-        if amount <= 0:
-            return []
-        output = self.client.run(
-            self.MODEL,
-            input={"prompt": prompt, "num_outputs": amount}
-        )
-        return output
+    def get_images(self, prompts: str) -> list[str]:
+        result = []
+        for prompt in prompts:
+            output = self.client.run(
+                self.MODEL,
+                input={"prompt": prompt}
+            )
+            result.append(output[0])
+        return result
 
 
 async def main():
     image_gen = ImageGenerator()
-    print(image_gen.get_images("cute plush toys 🧸", amount=0))
+    print(image_gen.get_images(
+        ["kids with toys", "fluffy friends", "love and happiness"]))
 
 
 if __name__ == "__main__":

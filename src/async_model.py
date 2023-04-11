@@ -20,7 +20,7 @@ def retry_policy(info: RetryInfo):
     exc = info.exception
     logger.warning(f"Retrying because of: {exc.__class__}. Total tries = {info.fails}")
     if isinstance(exc, ProgrammingError):
-        return info.fails >= MAX_FAILS, 5000
+        return info.fails >= MAX_FAILS, 5
     elif isinstance(exc, IndexError):
         return info.fails >= MAX_FAILS, 0
     return True, 0
@@ -105,24 +105,29 @@ class AsyncMotyaModel:
         logger.info(f"GENERATING POST WITH IMAGES: {inspiration}")
         text = await self.answer(f"напиши короткий пост про: {inspiration}")
         if self.image_gen is None:
+            logger.warning("Image Generator not found.")
             return Post(text, [])
 
-        inspiration_for_image = await self.answer(
+        inspirations_for_image = await self.answer(
             f"Какие картинки могут подойти к посту на тему: {inspiration}. "
             f"Напиши через запятую, без нумерации и лишнего текста. Делай максимально подробное описание картинок. " 
+            f"Не задавай картинки людей, используй только нейтральные темы. " 
             f"Напиши на английском языке."
         )
-        inspiration_for_image = random.choice(inspiration_for_image.split(",")).strip()
-        logger.info(f"GENERATING IMAGE: {inspiration_for_image}")
-        images = self.image_gen.get_images(inspiration_for_image, images_amount)
+        inspirations_for_image = inspirations_for_image.split(",")
+        random.shuffle(inspirations_for_image)
+        inspirations_for_image = inspirations_for_image[:images_amount]
+
+        logger.info(f"GENERATING IMAGES: {', '.join(inspirations_for_image)}")
+        images = self.image_gen.get_images(inspirations_for_image)
         
         return Post(text, images)
 
 
 async def main():
     image_gen = ImageGenerator()
-    motya = await AsyncMotyaModel.create(image_gen)
-    # print(await motya.create_random_post_with_images(["детский труд"], 4))
+    motya = await AsyncMotyaModel.create()
+    print(await motya.create_random_post(["игрушки"]))
 
 
 if __name__ == "__main__":
