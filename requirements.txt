@@ -1,5 +1,5 @@
 python-dotenv
-retry
+aioretry
 aiomysql
 aiogram
 aioschedule
