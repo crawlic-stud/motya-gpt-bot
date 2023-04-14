@@ -2,7 +2,6 @@ import base64
 import asyncio
 import logging
 
-import requests
 import aiohttp
 
 
@@ -10,7 +9,7 @@ logger = logging.getLogger("image_gen")
 
 
 def create_headers():
-    headers = requests.utils.default_headers()
+    headers = {}
     headers.update(
         {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/111.0.0.0 Safari/537.36"})
     headers.update({"Referer": "https://fusionbrain.ai/diffusion"})
