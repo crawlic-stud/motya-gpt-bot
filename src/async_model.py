@@ -34,6 +34,7 @@ class AsyncMotyaModel:
     """Class to connect to my Mindsdb model"""
     def __init__(self) -> None:
         self.pool: _PoolContextManager | None = None
+        self.image_gen: None = None
 
     @classmethod
     async def create(cls):

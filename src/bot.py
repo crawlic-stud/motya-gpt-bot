@@ -41,7 +41,10 @@ async def on_startup(dp: Dispatcher):
 @dp.message_handler(commands=["start"])
 async def send_start(message: types.Message, model: AsyncMotyaModel):
     await types.ChatActions.typing()
-    answer = await model.answer("привет!")
+    answer = "привет! " \
+        "я бот мотя на основе GPT-4, можешь смело задавать мне любые вопросы! " \
+        "только помни, что я еще совсем маленький и только учусь 😇 " \
+        '\n\nкстати! подпишись на мой <a href="https://t.me/motya_blog">блог</a>!'
     await message.reply(answer)
 
 
