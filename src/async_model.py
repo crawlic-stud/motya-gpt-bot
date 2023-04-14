@@ -9,16 +9,18 @@ import random
 import asyncio
 from dataclasses import dataclass
 
+from image_gen import ImageGenerator
+
 
 logger = logging.getLogger("model")
-MAX_FAILS = 10
+MAX_FAILS = 20
 
 
 def retry_policy(info: RetryInfo):
     exc = info.exception
     logger.warning(f"Retrying because of: {exc.__class__}. Total tries = {info.fails}")
     if isinstance(exc, ProgrammingError):
-        return info.fails >= MAX_FAILS, 5
+        return info.fails >= MAX_FAILS, 1
     elif isinstance(exc, IndexError):
         return info.fails >= MAX_FAILS, 0
     return True, 0
@@ -34,16 +36,17 @@ class AsyncMotyaModel:
     """Class to connect to my Mindsdb model"""
     def __init__(self) -> None:
         self.pool: _PoolContextManager | None = None
-        self.image_gen: None = None
+        self.image_gen: ImageGenerator | None = None
 
     @classmethod
-    async def create(cls):
+    async def create(cls, image_gen: ImageGenerator | None = None):
         instance = cls()
         instance.pool = await aiomysql.create_pool(
             host="cloud.mindsdb.com",
             user=os.getenv("USER"),
             password=os.getenv("PASSWORD"),
         )
+        instance.image_gen = image_gen
         return instance
     
     def __del__(self):
@@ -100,7 +103,7 @@ class AsyncMotyaModel:
     async def create_random_post_with_images(self, themes: list[str], images_amount: int) -> Post:
         inspiration = await self.get_random_inspiration(themes)
         logger.info(f"GENERATING POST WITH IMAGES: {inspiration}")
-        text = await self.answer(f"напиши короткий пост про: {inspiration}")
+        text: str = await self.answer(f"напиши короткий пост про: {inspiration}")
         if self.image_gen is None:
             logger.warning("Image Generator not found.")
             return Post(text, [])
@@ -116,7 +119,7 @@ class AsyncMotyaModel:
         inspirations_for_image = inspirations_for_image[:images_amount]
 
         logger.info(f"GENERATING IMAGES: {', '.join(inspirations_for_image)}")
-        images = self.image_gen.get_images(inspirations_for_image)
+        images = await self.image_gen.get_images(inspirations_for_image)
         
         return Post(text, images)
 
