@@ -10,6 +10,7 @@ import asyncio
 from dataclasses import dataclass
 
 from image_gen import ImageGenerator
+from models import Prompt
 
 
 logger = logging.getLogger("model")
@@ -117,9 +118,10 @@ class AsyncMotyaModel:
         inspirations_for_image = inspirations_for_image.split(",")
         random.shuffle(inspirations_for_image)
         inspirations_for_image = inspirations_for_image[:images_amount]
+        prompts = [Prompt(insp) for insp in inspirations_for_image]
 
         logger.info(f"GENERATING IMAGES: {', '.join(inspirations_for_image)}")
-        images = await self.image_gen.get_images(inspirations_for_image)
+        images = await self.image_gen.get_images(prompts)
         
         return Post(text, images)
 

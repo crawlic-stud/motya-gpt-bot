@@ -1,6 +1,7 @@
 import os
 import asyncio
 import io
+import argparse
 
 from aiogram import types, Bot, Dispatcher, executor
 from aiogram.contrib.fsm_storage.memory import MemoryStorage
@@ -11,6 +12,7 @@ from async_model import AsyncMotyaModel
 from model_middleware import ModelMiddleware
 from mongo import ConfigDb
 from image_gen import ImageGenerator
+from models import Prompt
 
 
 THROTTLE_RATE = 5
@@ -60,10 +62,31 @@ async def send_start(message: types.Message, model: AsyncMotyaModel):
     await message.reply(answer)
 
 
+# TODO: add resolution arg - might be dangerous
+def parse_args(args: str) -> Prompt | None:
+    args = args.split()
+    default_prompt = Prompt("")
+    parser = argparse.ArgumentParser()
+    parser.add_argument("text", nargs="*")
+    parser.add_argument(
+        "-style", "-s", 
+        nargs="*", 
+        type=str, 
+        help="style of image", 
+        default=default_prompt.style
+    )
+    args = parser.parse_args(args)
+
+    if not args.text:
+        return
+    
+    return Prompt(" ".join(args.text), " ".join(args.style))
+
+
 @dp.message_handler(commands=["draw"])
 @dp.throttled(on_draw_spam ,rate=THROTTLE_RATE)
 async def send_image(message: types.Message, model: AsyncMotyaModel):
-    prompt = message.get_args()
+    prompt = parse_args(message.get_args())
     if not prompt:
         msg = await message.answer("думаю 🐾 ...")
         answer = await model.answer(
@@ -72,10 +95,11 @@ async def send_image(message: types.Message, model: AsyncMotyaModel):
         await message.reply(answer)
         await msg.delete()
         return
+
     msg = await message.answer("рисую ✏️🐾 ...")
     image_bytes = await model.image_gen.get_images([prompt])
     file_ = types.InputFile(io.BytesIO(image_bytes[0])) 
-    await message.reply_photo(file_, caption="готово 🎨🐾")
+    await message.reply_photo(file_, caption=f'готово 🎨🐾\n<pre>{message.get_args()}</pre>')
     await msg.delete()
 
 
@@ -95,3 +119,10 @@ async def reply_to_message_in_chat(message: types.Message, model: AsyncMotyaMode
         await types.ChatActions.typing()
         answer = await model.answer(f"Ты писал про: {replied_text}. Ответь на: {message.text}")
         await message.reply(answer)
+
+
+if __name__ == "__main__":
+    from dotenv import load_dotenv
+    load_dotenv()
+    test_args = "милый тушканчик мотя -res test test"
+    print(parse_args(test_args))
