@@ -11,11 +11,12 @@ import aioschedule
 from async_model import AsyncMotyaModel
 from model_middleware import ModelMiddleware
 from mongo import ConfigDb
-from image_gen import ImageGenerator
+from image_gen import ImageGenerator, ImageGenerationError
 from models import Prompt
 
 
 THROTTLE_RATE = 5
+MAX_IMAGE_SIZE = 2048
 TOKEN = os.getenv("TG_TOKEN")
 bot = Bot(TOKEN, parse_mode="HTML")
 dp = Dispatcher(bot, storage=MemoryStorage())
@@ -62,7 +63,6 @@ async def send_start(message: types.Message, model: AsyncMotyaModel):
     await message.reply(answer)
 
 
-# TODO: add resolution arg - might be dangerous
 def parse_args(args: str) -> Prompt | None:
     args = args.split()
     default_prompt = Prompt("")
@@ -75,12 +75,30 @@ def parse_args(args: str) -> Prompt | None:
         help="style of image", 
         default=default_prompt.style
     )
-    args = parser.parse_args(args)
+    parser.add_argument(
+        "-res", "-r", 
+        nargs="*", 
+        help="image resolution", 
+        default=[default_prompt.width, default_prompt.height]
+    )
+    args, _ = parser.parse_known_args(args)
 
     if not args.text:
         return
-    
-    return Prompt(" ".join(args.text), " ".join(args.style))
+
+    try:
+        args.res = [int(item) for item in args.res]
+    except ValueError:
+        args.res = [default_prompt.width, default_prompt.height]
+
+    if not len(args.res) == 2:
+        raise ImageGenerationError(f"после -r нужно ввести ширину и высоту изображения 🫣")
+
+    w, h = args.res
+    if w > MAX_IMAGE_SIZE or h > MAX_IMAGE_SIZE:
+        raise ImageGenerationError(f"изображение не может быть больше чем {MAX_IMAGE_SIZE}x{MAX_IMAGE_SIZE} пикселей 🙄") 
+
+    return Prompt(" ".join(args.text), " ".join(args.style), w, h)
 
 
 @dp.message_handler(commands=["draw"])
@@ -119,6 +137,16 @@ async def reply_to_message_in_chat(message: types.Message, model: AsyncMotyaMode
         await types.ChatActions.typing()
         answer = await model.answer(f"Ты писал про: {replied_text}. Ответь на: {message.text}")
         await message.reply(answer)
+
+
+@dp.errors_handler(exception=ImageGenerationError)
+async def flood_error(update: types.Update, error):
+    try:
+        await update.message.reply(f"ошибка 🥶 {error}")
+    except Exception as e:
+        pass
+    finally:
+        return True 
 
 
 if __name__ == "__main__":

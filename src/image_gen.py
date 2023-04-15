@@ -25,7 +25,7 @@ def create_headers():
     return headers
 
 
-class SessionError(Exception):
+class ImageGenerationError(Exception):
     ...
 
 
@@ -42,7 +42,7 @@ class ImageGenerator:
     @staticmethod
     async def _process_response(response: aiohttp.ClientResponse, required_code: int = 200):
         if not response.status == required_code:
-            raise SessionError(f"Details: {await response.text()}")
+            raise ImageGenerationError(f"Details: {await response.text()}")
 
     async def _get_pocket_id(
         self,
@@ -106,7 +106,7 @@ class ImageGenerator:
             retries += 1
             status = await self._check_status(session, pocket_id)
         if not status or retries > self.MAX_RETRIES:
-            raise SessionError("Server is not responding.")
+            raise ImageGenerationError("Server is not responding.")
         image_bytes = await self._get_image_bytes(session, pocket_id)
         return image_bytes
 
@@ -123,9 +123,14 @@ async def main():
     image_gen = ImageGenerator()
     logging.basicConfig(level=logging.INFO)
     async with aiohttp.ClientSession(headers=image_gen.headers) as session:
-        prompt = "godzilla"
+        prompt = "милая девушка татарка с узкими зелеными глазами и широким лицом, маленьким носиком, глазами с макияжем, оранжевые светлые волосы, с букетом азалии в руках"
         image_bytes = await image_gen._get_image(
-            session, Prompt(prompt, "painted by Aivazovsky", 1024, 1024)
+            session, Prompt(
+                prompt, 
+                # "20 years old, realistic, true light, beautiful, beautiful face, dream-like, sigma 85mm f/1.4, 15mm, 35mm, 4k, high resolution, 4k, 8k, hd, full color", 
+                "A portrait of a 20 years old woman with green eyes in a white, flowy dress, standing in a field of wildflowers with the sun setting behind her",
+                768, 1024
+            )
         )
         with open(f"pics/{prompt}.png", "wb") as f:
             f.write(image_bytes)
