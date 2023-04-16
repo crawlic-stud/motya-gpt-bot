@@ -10,9 +10,9 @@ import aioschedule
 
 from async_model import AsyncMotyaModel
 from model_middleware import ModelMiddleware
-from mongo import ConfigDb
+from mongo import BotConfigDb, UserConfigDb
 from image_gen import ImageGenerator, ImageGenerationError
-from models import Prompt
+from models import Prompt, Resolution
 
 
 THROTTLE_RATE = 5
@@ -23,12 +23,14 @@ TOKEN = os.getenv("TG_TOKEN")
 bot = Bot(TOKEN, parse_mode="HTML")
 dp = Dispatcher(bot, storage=MemoryStorage())
 MONGO_URL = os.getenv("MONGO_URL")
-config_db = ConfigDb(MONGO_URL, "motya_gpt", "config")
+DB_NAME = "motya_gpt"
+bot_config_db = BotConfigDb(MONGO_URL, DB_NAME, "config")
+user_config_db = UserConfigDb(MONGO_URL, DB_NAME, "user_config")
 
 
 async def send_post(model: AsyncMotyaModel):
     group = "@motya_blog"
-    themes = config_db.get_themes()
+    themes = bot_config_db.get_themes()
     await bot.send_message(group, await model.create_random_post(themes))
 
 
@@ -47,7 +49,9 @@ async def on_startup(dp: Dispatcher):
     asyncio.create_task(posts_loop(motya))
     await bot.set_my_commands([
         types.BotCommand("start", "Поприветствовать Мотю"),
-        types.BotCommand("draw", "Нарисовать картинку по запросу")
+        types.BotCommand("draw", "Нарисовать картинку по запросу"),
+        types.BotCommand("style", "Поставить стандартный стиль картинок"),
+        types.BotCommand("res", "Поставить стандартное разрешение картинок"),
     ])
 
 
@@ -65,6 +69,19 @@ async def send_start(message: types.Message, model: AsyncMotyaModel):
     await message.reply(answer)
 
 
+def validate_resolution(res: list[str]) -> Resolution:
+    if len(res) == 2 and all(isinstance(item, int) for item in res):
+        return Resolution(*res)
+    elif len(res) != 2 or not all(item.isdigit() for item in res):
+        raise ImageGenerationError(f"нужно ввести ширину и высоту изображения двумя числами 🫣")
+
+    w, h = [int(item) for item in res]
+    if w > MAX_IMAGE_SIZE or h > MAX_IMAGE_SIZE:
+        raise ImageGenerationError(f"разрешение картинки не может быть больше чем {MAX_IMAGE_SIZE}x{MAX_IMAGE_SIZE} пикселей 🙄") 
+    
+    return Resolution(w, h)
+
+
 def parse_args(args: str) -> Prompt | None:
     args = args.split()
     parser = argparse.ArgumentParser()
@@ -80,26 +97,34 @@ def parse_args(args: str) -> Prompt | None:
         "-res", "-r", 
         nargs="*", 
         help="image resolution", 
-        default=[DEFAULT_PROMPT.width, DEFAULT_PROMPT.height]
+        default=DEFAULT_PROMPT.resolution
     )
     args, _ = parser.parse_known_args(args)
 
     if not args.text:
         return
 
-    try:
-        args.res = [int(item) for item in args.res]
-    except ValueError:
-        args.res = [DEFAULT_PROMPT.width, DEFAULT_PROMPT.height]
+    res = validate_resolution(args.res)
+    return Prompt(" ".join(args.text), " ".join(args.style), res)
 
-    if not len(args.res) == 2:
-        raise ImageGenerationError(f"после -r нужно ввести ширину и высоту изображения 🫣")
 
-    w, h = args.res
-    if w > MAX_IMAGE_SIZE or h > MAX_IMAGE_SIZE:
-        raise ImageGenerationError(f"изображение не может быть больше чем {MAX_IMAGE_SIZE}x{MAX_IMAGE_SIZE} пикселей 🙄") 
+@dp.message_handler(commands=["style"])
+async def set_style(message: types.Message):
+    style = message.get_args()
+    user_config_db.set_style(message.from_id, style)
+    await message.reply("поменял стандартный стиль 🥰")
 
-    return Prompt(" ".join(args.text), " ".join(args.style), w, h)
+
+@dp.message_handler(commands=["res"])
+async def set_style(message: types.Message):
+    args = message.get_args()
+    if not args:
+        user_config_db.set_resolution(message.from_id, Resolution())
+        await message.reply("поставил стандартное разрешение изображения ✅🥰")
+        return
+    res = validate_resolution(args.split())
+    user_config_db.set_resolution(message.from_id, res)
+    await message.reply("поменял стандартное разрешение изображения 🥰")
 
 
 @dp.message_handler(commands=["draw"])
@@ -109,19 +134,25 @@ async def send_image(message: types.Message, model: AsyncMotyaModel):
     if not prompt:
         msg = await message.answer("думаю 🐾 ...")
         answer = await model.answer(
-            "напиши чтобы пользователь отправил вместе с командой /draw то, что он хочет нарисовать"
+            "напиши: чтобы нарисовать что-то, нужно отправить вместе с командой /draw то, что хочешь нарисовать"
         )
         await message.reply(answer)
         await msg.delete()
         return
 
+    user_conf = user_config_db.get_user_config(message.from_id)
+    if prompt.is_default():
+        prompt = Prompt(prompt.text, user_conf.style, user_conf.resolution)
+
     msg = await message.answer("рисую ✏️🐾 ...")
     image_bytes = await model.image_gen.get_images([prompt])
     file_ = types.InputFile(io.BytesIO(image_bytes[0]), f"{prompt.text}.png")
-    if prompt.width == DEFAULT_PROMPT.width and prompt.height == DEFAULT_PROMPT.height:
+    
+    if prompt.resolution == DEFAULT_PROMPT.resolution:
         await message.reply_photo(file_, caption=f'готово 🎨🐾')
     else:
         await message.reply_document(file_, caption=f'готово 🎨🐾')
+    
     await msg.delete()
 
 
@@ -144,7 +175,7 @@ async def reply_to_message_in_chat(message: types.Message, model: AsyncMotyaMode
 
 
 @dp.errors_handler(exception=ImageGenerationError)
-async def flood_error(update: types.Update, error):
+async def generation_error(update: types.Update, error):
     try:
         await update.message.reply(f"ошибка 🥶 {error}")
     except Exception as e:

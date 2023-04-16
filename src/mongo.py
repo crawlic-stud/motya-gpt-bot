@@ -1,5 +1,7 @@
 import pymongo
 
+from models import UserConfig, Resolution
+
 
 class MongoDatabase:
     def __init__(self, url, db_name, collection_name):
@@ -12,7 +14,7 @@ class MongoDatabase:
         return self.client.count_documents({})
 
 
-class ConfigDb(MongoDatabase):
+class BotConfigDb(MongoDatabase):
     def get_themes(self) -> None | list[str]:
         result = self.client.find_one({"_id": "themes"}) or {}
         return result.get("themes")
@@ -32,3 +34,31 @@ class ConfigDb(MongoDatabase):
     def set_helper_prompt(self, prompt: str) -> None:
         self.client.update_one({"_id": "helper_prompt"}, {
                                "$set": {"prompt": prompt}}, upsert=True)
+
+
+class UserConfigDb(MongoDatabase):
+    def set_resolution(self, user_id: int, resolution: Resolution) -> None:
+        self.client.update_one(
+            {"user_id": user_id},
+            {"$set": {
+                "resolution": list(resolution),
+            }},
+            upsert=True
+        )
+
+    def set_style(self, user_id: int, style: str) -> None:
+        self.client.update_one(
+            {"user_id": user_id},
+            {"$set": {
+                "style": style,
+            }},
+            upsert=True
+        )
+
+    def get_user_config(self, user_id: int) -> UserConfig:
+        default_config = UserConfig()
+        conf = self.client.find_one({"user_id": user_id}) or {}
+        return UserConfig(
+            resolution=Resolution(*conf.get("resolution", [])),
+            style=conf.get("style", default_config.style),
+        )

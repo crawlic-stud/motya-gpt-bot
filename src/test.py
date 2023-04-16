@@ -4,11 +4,11 @@ from dotenv import load_dotenv
 import pytest
 
 from async_model import AsyncMotyaModel
-from mongo import ConfigDb
+from mongo import BotConfigDb
 
 
 load_dotenv()
-config_db = ConfigDb(os.getenv("MONGO_URL"), "motya_gpt", "config")
+config_db = BotConfigDb(os.getenv("MONGO_URL"), "motya_gpt", "config")
 
 
 def test_getting_themes():

@@ -5,7 +5,7 @@ import os
 
 import aiohttp
 
-from models import Prompt
+from models import Prompt, Resolution
 
 
 logger = logging.getLogger("image_gen")
@@ -56,8 +56,8 @@ class ImageGenerator:
                 "query": prompt.text,
                 "preset": 1,
                 "style": prompt.style,
-                "width": prompt.width,
-                "height": prompt.height,
+                "width": prompt.resolution.width,
+                "height": prompt.resolution.height,
             },
             # proxy=PROXY
         ) as response:
@@ -129,7 +129,7 @@ async def main():
                 prompt, 
                 # "20 years old, realistic, true light, beautiful, beautiful face, dream-like, sigma 85mm f/1.4, 15mm, 35mm, 4k, high resolution, 4k, 8k, hd, full color", 
                 "A portrait of a 20 years old woman with green eyes in a white, flowy dress, standing in a field of wildflowers with the sun setting behind her",
-                768, 1024
+                Resolution(768, 1024)
             )
         )
         with open(f"pics/{prompt}.png", "wb") as f:
