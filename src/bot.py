@@ -116,7 +116,8 @@ async def send_image(message: types.Message, model: AsyncMotyaModel):
 
     msg = await message.answer("рисую ✏️🐾 ...")
     image_bytes = await model.image_gen.get_images([prompt])
-    file_ = types.InputFile(io.BytesIO(image_bytes[0])) 
+    file_ = types.InputFile(io.BytesIO(image_bytes[0]), f"{prompt.text}.png") 
+    # await message.reply_document(file_, caption=f'готово 🎨🐾')
     await message.reply_photo(file_, caption=f'готово 🎨🐾')
     await msg.delete()
 

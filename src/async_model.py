@@ -62,7 +62,7 @@ class AsyncMotyaModel:
 
     @retry(retry_policy=retry_policy)
     async def answer(self, text: str, model_name: str = "mindsdb.motya_model") -> str:
-        result = await self._execute(f'SELECT response from {model_name} WHERE text="{text}";')
+        result = await self._execute(f'SELECT response from {model_name} WHERE text='{text}';')
         return result[0]
 
     async def get_inspirations(self, theme: str) -> list[str]:
