@@ -17,6 +17,8 @@ from models import Prompt
 
 THROTTLE_RATE = 5
 MAX_IMAGE_SIZE = 2048
+DEFAULT_PROMPT = Prompt("")
+
 TOKEN = os.getenv("TG_TOKEN")
 bot = Bot(TOKEN, parse_mode="HTML")
 dp = Dispatcher(bot, storage=MemoryStorage())
@@ -65,7 +67,6 @@ async def send_start(message: types.Message, model: AsyncMotyaModel):
 
 def parse_args(args: str) -> Prompt | None:
     args = args.split()
-    default_prompt = Prompt("")
     parser = argparse.ArgumentParser()
     parser.add_argument("text", nargs="*")
     parser.add_argument(
@@ -73,13 +74,13 @@ def parse_args(args: str) -> Prompt | None:
         nargs="*", 
         type=str, 
         help="style of image", 
-        default=default_prompt.style
+        default=DEFAULT_PROMPT.style
     )
     parser.add_argument(
         "-res", "-r", 
         nargs="*", 
         help="image resolution", 
-        default=[default_prompt.width, default_prompt.height]
+        default=[DEFAULT_PROMPT.width, DEFAULT_PROMPT.height]
     )
     args, _ = parser.parse_known_args(args)
 
@@ -89,7 +90,7 @@ def parse_args(args: str) -> Prompt | None:
     try:
         args.res = [int(item) for item in args.res]
     except ValueError:
-        args.res = [default_prompt.width, default_prompt.height]
+        args.res = [DEFAULT_PROMPT.width, DEFAULT_PROMPT.height]
 
     if not len(args.res) == 2:
         raise ImageGenerationError(f"после -r нужно ввести ширину и высоту изображения 🫣")
@@ -116,8 +117,11 @@ async def send_image(message: types.Message, model: AsyncMotyaModel):
 
     msg = await message.answer("рисую ✏️🐾 ...")
     image_bytes = await model.image_gen.get_images([prompt])
-    file_ = types.InputFile(io.BytesIO(image_bytes[0])) 
-    await message.reply_photo(file_, caption=f'готово 🎨🐾')
+    file_ = types.InputFile(io.BytesIO(image_bytes[0]), f"{prompt.text}.png")
+    if prompt.width == DEFAULT_PROMPT.width and prompt.height == DEFAULT_PROMPT.height:
+        await message.reply_photo(file_, caption=f'готово 🎨🐾')
+    else:
+        await message.reply_document(file_, caption=f'готово 🎨🐾')
     await msg.delete()
 
 
