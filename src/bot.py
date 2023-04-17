@@ -196,13 +196,14 @@ async def send_image(message: types.Message, model: AsyncMotyaModel):
 
 
 @dp.message_handler(IDFilter(ADMIN_ID), commands=["prompt"])
-async def prompt(message: types.Message):
+async def prompt(message: types.Message, model: AsyncMotyaModel):
     current = bot_config_db.get_main_prompt()
     await message.reply(current)
     new = message.get_args()
     if not new:
         return
     bot_config_db.set_main_prompt(new)
+    await model.reset_model(new)
     await message.reply("обновил 🤗")
 
 
