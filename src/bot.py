@@ -18,7 +18,8 @@ from image_gen import ImageGenerator, ImageGenerationError
 from models import Prompt, Resolution
 
 
-THROTTLE_RATE = 5
+THROTTLE_RATE_IMAGE = 5
+THROTTLE_RATE_MESSAGE = 1
 MAX_IMAGE_SIZE = 2048
 MAX_CAPTION_SIZE = 1024
 GROUP_NAME = "@motya_blog"
@@ -95,10 +96,15 @@ async def on_startup(dp: Dispatcher):
 
 
 async def on_draw_spam(message, *args, **kwargs):
-    await message.reply(f"ой 🙄 команду /draw можно нажимать не чаще чем раз в {THROTTLE_RATE} секунд 😝")
+    await message.reply(f"ой 🙄 команду /draw можно нажимать не чаще чем раз в {THROTTLE_RATE_IMAGE} секунд 😝")
+
+
+async def on_message_spam(message, *args, **kwargs):
+    await message.reply("ой 🙄 пожалуйста, не пишите мне так часто, я не успеваю 😣")
 
 
 @dp.message_handler(commands=["start"])
+@dp.throttled(on_message_spam, rate=THROTTLE_RATE_MESSAGE)
 async def send_start(message: types.Message, model: AsyncMotyaModel):
     await types.ChatActions.typing()
     answer =  \
@@ -148,13 +154,14 @@ def parse_args(args: str) -> Prompt | None:
 
 
 @dp.message_handler(commands=["style"])
+@dp.throttled(on_message_spam, rate=THROTTLE_RATE_MESSAGE)
 async def set_style(message: types.Message):
     style = message.get_args()
     user_config_db.set_style(message.from_id, style)
     await message.reply("поменял стандартный стиль 🥰")
 
-
 @dp.message_handler(commands=["res"])
+@dp.throttled(on_message_spam, rate=THROTTLE_RATE_MESSAGE)
 async def set_style(message: types.Message):
     args = message.get_args()
     if not args:
@@ -167,7 +174,7 @@ async def set_style(message: types.Message):
 
 
 @dp.message_handler(commands=["draw"])
-@dp.throttled(on_draw_spam ,rate=THROTTLE_RATE)
+@dp.throttled(on_draw_spam ,rate=THROTTLE_RATE_IMAGE)
 async def send_image(message: types.Message, model: AsyncMotyaModel):
     prompt = parse_args(message.get_args())
     if not prompt:
@@ -225,6 +232,7 @@ async def test(message: types.Message, model: AsyncMotyaModel):
 
 
 @dp.message_handler(ChatTypeFilter(types.ChatType.PRIVATE))
+@dp.throttled(on_message_spam, rate=THROTTLE_RATE_MESSAGE)
 async def reply_to_message_privately(message: types.Message, model: AsyncMotyaModel):
     msg = await message.answer("секундочку 🐾 ...")
     answer = await model.answer(message.text)
@@ -233,6 +241,7 @@ async def reply_to_message_privately(message: types.Message, model: AsyncMotyaMo
 
 
 @dp.message_handler(IsReplyFilter(True))
+@dp.throttled(on_message_spam, rate=THROTTLE_RATE_MESSAGE)
 async def reply_to_message_in_chat(message: types.Message, model: AsyncMotyaModel):
     replied_id = message.reply_to_message.from_id
     if replied_id == bot.id or replied_id == -1001928224337:
