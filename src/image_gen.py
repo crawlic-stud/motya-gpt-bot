@@ -54,7 +54,7 @@ class ImageGenerator:
             json={
                 "queueType": "generate",
                 "query": prompt.text,
-                "preset": 1,
+                "preset": "1",
                 "style": prompt.style,
                 "width": prompt.resolution.width,
                 "height": prompt.resolution.height,
