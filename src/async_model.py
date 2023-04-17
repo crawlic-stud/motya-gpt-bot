@@ -105,22 +105,26 @@ class AsyncMotyaModel:
         inspiration = await self.get_random_inspiration(themes)
         logger.info(f"GENERATING POST WITH IMAGES: {inspiration}")
         text: str = await self.answer(f"напиши короткий пост про: {inspiration}")
-        if self.image_gen is None:
-            logger.warning("Image Generator not found.")
+        if self.image_gen is None or images_amount <= 0:
+            logger.warning("Image weren't generated.")
             return Post(text, [])
 
         inspirations_for_image = await self.answer(
-            f"Какие картинки могут подойти к посту на тему: {inspiration}. "
-            f"Напиши через запятую, без нумерации и лишнего текста. Делай максимально подробное описание картинок. " 
-            f"Не задавай картинки людей, используй только нейтральные темы. " 
-            f"Напиши на английском языке."
+            f"Какие картинки больше всего подойдут к посту: {text}. "
+            f"Напиши максимально кратко, не более 5 слов на каждую тему, напиши через запятую, не используй эмодзи."
         )
         inspirations_for_image = inspirations_for_image.split(",")
         random.shuffle(inspirations_for_image)
         inspirations_for_image = inspirations_for_image[:images_amount]
-        prompts = [Prompt(insp) for insp in inspirations_for_image]
+        style = random.choice([f"{item}, no text" for item in [
+            "colourful", 
+            "imaginative",
+            "abstract, meaningful",
+            "cartoon"
+        ]])
+        prompts = [Prompt(insp, style) for insp in inspirations_for_image]
 
-        logger.info(f"GENERATING IMAGES: {', '.join(inspirations_for_image)}")
+        logger.info(f"GENERATING IMAGES ({images_amount}): {', '.join(inspirations_for_image)}")
         images = await self.image_gen.get_images(prompts)
         
         return Post(text, images)

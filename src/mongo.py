@@ -19,6 +19,12 @@ class BotConfigDb(MongoDatabase):
         result = self.client.find_one({"_id": "themes"}) or {}
         return result.get("themes")
 
+    def add_themes(self, themes: list[str]) -> None:
+        self.client.update_one(
+            {"_id": "themes"},
+            {"$addToSet": {"themes": {"$each": themes}}}
+        )
+
     def get_main_prompt(self) -> None | str:
         result = self.client.find_one({"_id": "main_prompt"}) or {}
         return result.get("prompt")

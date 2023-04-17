@@ -2,10 +2,13 @@ import os
 import asyncio
 import io
 import argparse
+import random
+import logging
 
 from aiogram import types, Bot, Dispatcher, executor
 from aiogram.contrib.fsm_storage.memory import MemoryStorage
 from aiogram.dispatcher.filters import ChatTypeFilter, IsReplyFilter, IDFilter
+from aiogram.utils.exceptions import BadRequest
 import aioschedule
 
 from async_model import AsyncMotyaModel
@@ -17,26 +20,52 @@ from models import Prompt, Resolution
 
 THROTTLE_RATE = 5
 MAX_IMAGE_SIZE = 2048
+MAX_CAPTION_SIZE = 1024
+GROUP_NAME = "@motya_blog"
 DEFAULT_PROMPT = Prompt("")
 
 TOKEN = os.getenv("TG_TOKEN")
+ADMIN_ID = int(os.getenv("ADMIN_ID"))
 bot = Bot(TOKEN, parse_mode="HTML")
 dp = Dispatcher(bot, storage=MemoryStorage())
 MONGO_URL = os.getenv("MONGO_URL")
 DB_NAME = "motya_gpt"
 bot_config_db = BotConfigDb(MONGO_URL, DB_NAME, "config")
 user_config_db = UserConfigDb(MONGO_URL, DB_NAME, "user_config")
+logger = logging.getLogger("bot")
 
 
-async def send_post(model: AsyncMotyaModel):
-    group = "@motya_blog"
+def create_media(images: list[bytes], caption: str = None) -> types.MediaGroup:
+    media = types.MediaGroup()
+    media.attach_photo(types.InputFile(io.BytesIO((images[0])), "image.png"), caption)
+    for image in images[1:]:
+        media.attach_photo(types.InputFile(io.BytesIO(image), "image.png"))
+    return media
+
+
+async def send_post(model: AsyncMotyaModel, group: str | int = None):
     themes = bot_config_db.get_themes()
-    await bot.send_message(group, await model.create_random_post(themes))
+    images = random.choice([0, 1, 3])
+    
+    group = GROUP_NAME if not group else group
+
+    post = await model.create_random_post_with_images(themes, images)
+    if not images:
+        await bot.send_message(group, post.text)
+        return
+        
+    if len(post.text) < MAX_CAPTION_SIZE:
+        media = create_media(post.images, post.text)
+        await bot.send_media_group(group, media)
+    else:
+        media = create_media(post.images)
+        await bot.send_media_group(group, media)
+        await bot.send_message(group, post.text)
 
 
 async def posts_loop(model: AsyncMotyaModel):
     for time in ["8:10", "11:50", "14:05", "16:45", "19:05"]:
-        aioschedule.every().day.at(time).do(send_post, model)
+        aioschedule.every().day.at(time).do(send_post, model, None)
     while True:
         await aioschedule.run_pending()
         await asyncio.sleep(1)
@@ -47,12 +76,22 @@ async def on_startup(dp: Dispatcher):
     motya = await AsyncMotyaModel.create(image_gen)
     dp.middleware.setup(ModelMiddleware(motya))
     asyncio.create_task(posts_loop(motya))
-    await bot.set_my_commands([
+    basic_commands = [
         types.BotCommand("start", "Поприветствовать Мотю"),
         types.BotCommand("draw", "Нарисовать картинку по запросу"),
         types.BotCommand("style", "Поставить стандартный стиль картинок"),
         types.BotCommand("res", "Поставить стандартное разрешение картинок"),
-    ])
+    ] 
+    await bot.set_my_commands(basic_commands)
+    await bot.set_my_commands(
+        [
+            *basic_commands,
+            types.BotCommand("prompt", "Поменять личность бота"),
+            types.BotCommand("themes", "Добавить или посмотреть темы"),
+            types.BotCommand("test", "Тестовая команда"),
+        ],
+        types.BotCommandScopeChat(chat_id=ADMIN_ID)
+    )
 
 
 async def on_draw_spam(message, *args, **kwargs):
@@ -156,6 +195,34 @@ async def send_image(message: types.Message, model: AsyncMotyaModel):
     await msg.delete()
 
 
+@dp.message_handler(IDFilter(ADMIN_ID), commands=["prompt"])
+async def prompt(message: types.Message):
+    current = bot_config_db.get_main_prompt()
+    await message.reply(current)
+    new = message.get_args()
+    if not new:
+        return
+    bot_config_db.set_main_prompt(new)
+    await message.reply("обновил 🤗")
+
+
+@dp.message_handler(IDFilter(ADMIN_ID), commands=["themes"])
+async def prompt(message: types.Message):
+    current = "\n".join(bot_config_db.get_themes())
+    new = message.get_args()
+    await message.reply(current)
+    if not new:
+        return
+    bot_config_db.add_themes(
+        [theme.strip() for theme in new.split(",")])
+    await message.reply("добавил темы 🤗")
+
+
+@dp.message_handler(IDFilter(ADMIN_ID), commands=["test"])
+async def test(message: types.Message, model: AsyncMotyaModel):
+    await send_post(model, message.from_id)
+
+
 @dp.message_handler(ChatTypeFilter(types.ChatType.PRIVATE))
 async def reply_to_message_privately(message: types.Message, model: AsyncMotyaModel):
     msg = await message.answer("секундочку 🐾 ...")
@@ -187,5 +254,5 @@ async def generation_error(update: types.Update, error):
 if __name__ == "__main__":
     from dotenv import load_dotenv
     load_dotenv()
-    test_args = "милый тушканчик мотя -res test test"
-    print(parse_args(test_args))
+    
+    bot_config_db.add_themes()
