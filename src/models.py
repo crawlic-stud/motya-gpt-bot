@@ -1,12 +1,16 @@
 from typing import NamedTuple
-
+from dataclasses import dataclass
 
 DEFAULT_SIZE = 768
 
 
-class Post(NamedTuple):
+@dataclass
+class Post:
     text: str
-    images: list[bytes]
+    images: list[str]
+
+    def __post_init__(self):
+        self.text = self.text.lower()
 
 
 class Resolution(NamedTuple):

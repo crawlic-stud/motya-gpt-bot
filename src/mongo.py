@@ -25,6 +25,16 @@ class BotConfigDb(MongoDatabase):
             {"$addToSet": {"themes": {"$each": themes}}}
         )
 
+    def get_image_styles(self) -> None | list[str]:
+        result = self.client.find_one({"_id": "styles"}) or {}
+        return result.get("styles")
+
+    def add_image_styles(self, styles: list[str]) -> None:
+        self.client.update_one(
+            {"_id": "styles"},
+            {"$addToSet": {"styles": {"$each": styles}}}
+        )
+
     def get_main_prompt(self) -> None | str:
         result = self.client.find_one({"_id": "main_prompt"}) or {}
         return result.get("prompt")

@@ -127,7 +127,6 @@ async def main():
         image_bytes = await image_gen._get_image(
             session, Prompt(
                 prompt, 
-                # "20 years old, realistic, true light, beautiful, beautiful face, dream-like, sigma 85mm f/1.4, 15mm, 35mm, 4k, high resolution, 4k, 8k, hd, full color", 
                 "A portrait of a 20 years old woman with green eyes in a white, flowy dress, standing in a field of wildflowers with the sun setting behind her",
                 Resolution(768, 1024)
             )
