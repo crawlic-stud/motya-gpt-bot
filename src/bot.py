@@ -47,11 +47,12 @@ def create_media(images: list[bytes], caption: str = None) -> types.MediaGroup:
 
 async def send_post(model: AsyncMotyaModel, group: str | int = None):
     themes = bot_config_db.get_themes()
+    styles = bot_config_db.get_image_styles()    
     images = random.choice([1, 3])
-    
+
     group = GROUP_NAME if not group else group
 
-    post = await model.create_random_post_with_images(themes, images)
+    post = await model.create_random_post_with_images(themes, images, styles)
     if not images:
         await bot.send_message(group, post.text)
         return

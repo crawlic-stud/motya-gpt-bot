@@ -10,11 +10,14 @@ import asyncio
 from dataclasses import dataclass
 
 from image_gen import ImageGenerator
-from models import Prompt
+from models import Prompt, Post
 
 
 logger = logging.getLogger("model")
 MAX_FAILS = 20
+MAIN_MODEL = "mindsdb.motya_model"
+THEME_MODEL = "mindsdb.motya_helper"
+PIC_MODEL = "mindsdb.pic_helper"
 
 
 def retry_policy(info: RetryInfo):
@@ -26,12 +29,6 @@ def retry_policy(info: RetryInfo):
         return info.fails >= MAX_FAILS, 0
     return True, 0
 
-
-@dataclass
-class Post:
-    text: str
-    images: list[str]
-    
 
 class AsyncMotyaModel:
     """Class to connect to my Mindsdb model"""
@@ -61,20 +58,24 @@ class AsyncMotyaModel:
                 return result
 
     @retry(retry_policy=retry_policy)
-    async def answer(self, text: str, model_name: str = "mindsdb.motya_model") -> str:
+    async def answer(self, text: str, model_name: str = MAIN_MODEL) -> str:
         result = await self._execute(f"SELECT response from {model_name} WHERE text='{text}';")
         return result[0]
 
     async def get_inspirations(self, theme: str) -> list[str]:
-        inspirations = await self.answer(theme, "mindsdb.motya_helper")
+        inspirations = await self.answer(theme, THEME_MODEL)
         return inspirations.split(",")
+
+    async def get_image_inspirations(self, post_text: str) -> list[str]:
+        inspirations = await self.answer(post_text, PIC_MODEL)
+        return inspirations.split(";")
 
     async def get_random_inspiration(self, themes: list[str]) -> str:
         theme = random.choice(themes)
         inspiration = random.choice(await self.get_inspirations(theme)).strip()
         return inspiration
 
-    async def reset_model(self, prompt, model_name: str = "mindsdb.motya_model") -> None:
+    async def reset_model(self, prompt, model_name: str = MAIN_MODEL) -> None:
         try:
             await self._execute(f"DROP TABLE {model_name}")
             logger.info(f"Dropped table: {model_name}")
@@ -101,7 +102,12 @@ class AsyncMotyaModel:
         logger.info(f"GENERATING POST: {inspiration}")
         return await self.answer(f"напиши короткий пост про: {inspiration}")
 
-    async def create_random_post_with_images(self, themes: list[str], images_amount: int) -> Post:
+    async def create_random_post_with_images(
+        self, 
+        themes: list[str], 
+        images_amount: int, 
+        image_styles: list[str]
+    ) -> Post:
         inspiration = await self.get_random_inspiration(themes)
         logger.info(f"GENERATING POST WITH IMAGES: {inspiration}")
         text: str = await self.answer(f"напиши короткий пост про: {inspiration}")
@@ -109,19 +115,15 @@ class AsyncMotyaModel:
             logger.warning("Image weren't generated.")
             return Post(text, [])
 
-        inspirations_for_image = await self.answer(
-            f"Какие картинки больше всего подойдут к посту: {text}. "
-            f"Напиши максимально кратко, не более 5 слов на каждую тему, напиши через запятую, не используй эмодзи."
-        )
-        inspirations_for_image = inspirations_for_image.split(",")
+        # inspirations_for_image = await self.answer(
+        #     f"Какие картинки больше всего подойдут к посту: {text}. "
+        #     f"Напиши максимально кратко, напиши через точку с запятой, не используй эмодзи."
+        # )
+        inspirations_for_image = await self.get_image_inspirations(text)
+        # inspirations_for_image = inspirations_for_image.split(";")
         random.shuffle(inspirations_for_image)
         inspirations_for_image = inspirations_for_image[:images_amount]
-        style = random.choice([f"{item}, no text" for item in [
-            "colourful", 
-            "imaginative",
-            "abstract, meaningful",
-            "cartoon"
-        ]])
+        style = random.choice([f"{item}, no text" for item in image_styles])
         prompts = [Prompt(insp, style) for insp in inspirations_for_image]
 
         logger.info(f"GENERATING IMAGES ({images_amount}): {', '.join(inspirations_for_image)}")
