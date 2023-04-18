@@ -9,6 +9,7 @@ from aiogram import types, Bot, Dispatcher, executor
 from aiogram.contrib.fsm_storage.memory import MemoryStorage
 from aiogram.dispatcher.filters import ChatTypeFilter, IsReplyFilter, IDFilter
 from aiogram.utils.exceptions import BadRequest
+from aiohttp.client_exceptions import ClientConnectionError
 import aioschedule
 
 from async_model import AsyncMotyaModel
@@ -160,6 +161,7 @@ async def set_style(message: types.Message):
     user_config_db.set_style(message.from_id, style)
     await message.reply("поменял стандартный стиль 🥰")
 
+
 @dp.message_handler(commands=["res"])
 @dp.throttled(on_message_spam, rate=THROTTLE_RATE_MESSAGE)
 async def set_style(message: types.Message):
@@ -251,14 +253,24 @@ async def reply_to_message_in_chat(message: types.Message, model: AsyncMotyaMode
         await message.reply(answer)
 
 
-@dp.errors_handler(exception=ImageGenerationError)
-async def generation_error(update: types.Update, error):
+async def basic_error(update: types.Update, error_msg: str):
     try:
-        await update.message.reply(f"ошибка 🥶 {error}")
+        await update.message.reply(error_msg)
     except Exception as e:
+        logger.error(e)
         pass
     finally:
         return True 
+
+
+@dp.errors_handler(exception=ImageGenerationError)
+async def generation_error(update: types.Update, error):
+    await basic_error(update, f"ошибка 🥶 {error}")
+
+
+@dp.errors_handler(exception=ClientConnectionError)
+async def connection_error(update: types.Update, error):
+    await basic_error(update, f"не могу найти свой карандаш и краски 😭")
 
 
 if __name__ == "__main__":
