@@ -247,6 +247,7 @@ async def save_history(data, messages: list[str]):
 @dp.message_handler(ChatTypeFilter(types.ChatType.PRIVATE))
 @dp.throttled(on_message_spam, rate=THROTTLE_RATE_MESSAGE)
 async def reply_to_message_privately(message: types.Message, model: AsyncMotyaModel, state: FSMContext):
+    logger.info(f"Answering to {message.from_id} in chat {message.chat.id}")
     await types.ChatActions.typing()
     msg = await message.answer("секундочку 🐾 ...")
     async with state.proxy() as data:
@@ -261,6 +262,7 @@ async def reply_to_message_privately(message: types.Message, model: AsyncMotyaMo
 @dp.message_handler(IsReplyFilter(True))
 @dp.throttled(on_message_spam, rate=THROTTLE_RATE_MESSAGE)
 async def reply_to_question_in_chat(message: types.Message, model: AsyncMotyaModel, state: FSMContext):
+    logger.info(f"Answering to {message.from_id} in chat {message.chat.id}")
     if message.get_command():
         message.text = message.get_args()
         if not message.text:
