@@ -59,8 +59,18 @@ class AsyncMotyaModel:
 
     @retry(retry_policy=retry_policy)
     async def answer(self, text: str, model_name: str = MAIN_MODEL) -> str:
+        logger.info("Answering...")
         result = await self._execute(f"SELECT response from {model_name} WHERE text='{text}';")
         return result[0]
+
+    async def answer_with_history(self, text: str, history: list[str], model_name: str = MAIN_MODEL) -> str:
+        logger.info("Answering with history...")
+        dialog = "\n".join([
+            f" - {line}" for line in history
+        ])
+        prompt = f"Ответь на сообщение, учитывая историю диалога. Сообщение: {text}. Диалог: \n{dialog}"
+        result = await self.answer(prompt)
+        return result
 
     async def get_inspirations(self, theme: str) -> list[str]:
         inspirations = await self.answer(theme, THEME_MODEL)
