@@ -258,23 +258,34 @@ async def reply_to_message_privately(message: types.Message, model: AsyncMotyaMo
         await msg.delete()
 
 
-@dp.message_handler(commands=["ask"])
-@dp.message_handler(IsReplyFilter(True))
-@dp.throttled(on_message_spam, rate=THROTTLE_RATE_MESSAGE)
 async def reply_to_question_in_chat(message: types.Message, model: AsyncMotyaModel, state: FSMContext):
     logger.info(f"Answering to {message.from_id} in chat {message.chat.id}")
-    if message.get_command():
-        message.text = message.get_args()
-        if not message.text:
-            await message.reply("на что вы хотите чтобы я ответил? 🤓")
-            return    
-
     await types.ChatActions.typing()
     async with state.proxy() as data:
         history = data.get("history", [])
         answer = await model.answer_with_history(message.text, history)
         await message.reply(answer)
         await save_history(data, [message.text, answer])
+
+
+@dp.message_handler(IsReplyFilter(True))
+@dp.throttled(on_message_spam, rate=THROTTLE_RATE_MESSAGE)
+async def handle_reply_in_chat(message: types.Message, model: AsyncMotyaModel, state: FSMContext):
+    from_user = message.reply_to_message.from_user
+    if not (from_user.is_bot and from_user.id == bot.id):
+        return
+    await reply_to_question_in_chat(message, model, state)
+
+
+@dp.message_handler(commands=["ask"])
+@dp.throttled(on_message_spam, rate=THROTTLE_RATE_MESSAGE)
+async def handle_ask_command_in_chat(message: types.Message, model: AsyncMotyaModel, state: FSMContext):
+    if message.get_command():
+        message.text = message.get_args()
+        if not message.text:
+            await message.reply("на что вы хотите чтобы я ответил? 🤓")
+            return 
+    await reply_to_question_in_chat(message, model, state)
 
 
 async def basic_error(update: types.Update, error_msg: str):
