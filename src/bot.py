@@ -25,6 +25,7 @@ CHAT_HISTORY_SIZE = 5
 THROTTLE_RATE_MESSAGE = 1
 MAX_IMAGE_SIZE = 2048
 MAX_CAPTION_SIZE = 1024
+BLOG_ID = -1001928224337
 GROUP_NAME = "@motya_blog"
 DEFAULT_PROMPT = Prompt("")
 
@@ -272,7 +273,7 @@ async def reply_to_question_in_chat(message: types.Message, model: AsyncMotyaMod
 @dp.throttled(on_message_spam, rate=THROTTLE_RATE_MESSAGE)
 async def handle_reply_in_chat(message: types.Message, model: AsyncMotyaModel, state: FSMContext):
     from_user = message.reply_to_message.from_user
-    if not (from_user.is_bot and from_user.id == bot.id):
+    if from_user.id != bot.id or from_user.id != BLOG_ID:
         return
     await reply_to_question_in_chat(message, model, state)
 
