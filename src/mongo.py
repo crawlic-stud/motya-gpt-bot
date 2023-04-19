@@ -78,3 +78,7 @@ class UserConfigDb(MongoDatabase):
             resolution=Resolution(*conf.get("resolution", [])),
             style=conf.get("style", default_config.style),
         )
+
+
+class ChatHistoryDb(MongoDatabase):
+    ...

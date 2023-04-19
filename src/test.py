@@ -1,10 +1,14 @@
 import os
+import random
+from string import ascii_letters
+import asyncio
 
 from dotenv import load_dotenv
 import pytest
 
 from async_model import AsyncMotyaModel
 from mongo import BotConfigDb
+from models import CappedList
 
 
 load_dotenv()
@@ -24,6 +28,18 @@ async def test_creates_random_post():
     assert isinstance(post, str), "Must be a string!"
 
 
+def test_chat_queue():
+    max_store = 10
+    queue = CappedList(max_store)
+    for _ in range(10000):
+        msg = "".join(random.choices(ascii_letters, k=10))
+        queue.add_message(msg)
+        print(queue)
+        assert len(
+            queue) <= max_store, f"Queue size must not exceed {max_store} elements"
+
+
 if __name__ == "__main__":
-    test_getting_themes()
-    test_creates_random_post()
+    # test_getting_themes()
+    # asyncio.run(test_creates_random_post())
+    test_chat_queue()

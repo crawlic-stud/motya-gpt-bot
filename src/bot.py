@@ -5,10 +5,11 @@ import argparse
 import random
 import logging
 
-from aiogram import types, Bot, Dispatcher, executor
+from aiogram import types, Bot, Dispatcher
 from aiogram.contrib.fsm_storage.memory import MemoryStorage
+from aiogram.contrib.fsm_storage.mongo import MongoStorage
 from aiogram.dispatcher.filters import ChatTypeFilter, IsReplyFilter, IDFilter
-from aiogram.utils.exceptions import BadRequest
+from aiogram.dispatcher.storage import FSMContext
 from aiohttp.client_exceptions import ClientConnectionError
 import aioschedule
 
@@ -16,10 +17,11 @@ from async_model import AsyncMotyaModel
 from model_middleware import ModelMiddleware
 from mongo import BotConfigDb, UserConfigDb
 from image_gen import ImageGenerator, ImageGenerationError
-from models import Prompt, Resolution
+from models import Prompt, Resolution, CappedList
 
 
 THROTTLE_RATE_IMAGE = 5
+CHAT_HISTORY_SIZE = 5
 THROTTLE_RATE_MESSAGE = 1
 MAX_IMAGE_SIZE = 2048
 MAX_CAPTION_SIZE = 1024
@@ -28,10 +30,12 @@ DEFAULT_PROMPT = Prompt("")
 
 TOKEN = os.getenv("TG_TOKEN")
 ADMIN_ID = int(os.getenv("ADMIN_ID"))
-bot = Bot(TOKEN, parse_mode="HTML")
-dp = Dispatcher(bot, storage=MemoryStorage())
 MONGO_URL = os.getenv("MONGO_URL")
 DB_NAME = "motya_gpt"
+
+bot = Bot(TOKEN, parse_mode="HTML")
+# dp = Dispatcher(bot, storage=MemoryStorage())
+dp = Dispatcher(bot, storage=MongoStorage(uri=MONGO_URL, db_name=DB_NAME))
 bot_config_db = BotConfigDb(MONGO_URL, DB_NAME, "config")
 user_config_db = UserConfigDb(MONGO_URL, DB_NAME, "user_config")
 logger = logging.getLogger("bot")
@@ -82,6 +86,7 @@ async def on_startup(dp: Dispatcher):
     basic_commands = [
         types.BotCommand("start", "Поприветствовать Мотю"),
         types.BotCommand("draw", "Нарисовать картинку по запросу"),
+        types.BotCommand("ask", "Спросить у бота что угодно (функция для чатов)"),
         types.BotCommand("style", "Поставить стандартный стиль картинок"),
         types.BotCommand("res", "Поставить стандартное разрешение картинок"),
     ] 
@@ -234,24 +239,40 @@ async def test(message: types.Message, model: AsyncMotyaModel):
     await send_post(model, message.from_id)
 
 
+async def save_history(data, messages: list[str]):
+    history = CappedList([*data.get("history", []), *messages], max_store=CHAT_HISTORY_SIZE)
+    data["history"] = history
+
+
 @dp.message_handler(ChatTypeFilter(types.ChatType.PRIVATE))
 @dp.throttled(on_message_spam, rate=THROTTLE_RATE_MESSAGE)
-async def reply_to_message_privately(message: types.Message, model: AsyncMotyaModel):
+async def reply_to_message_privately(message: types.Message, model: AsyncMotyaModel, state: FSMContext):
+    await types.ChatActions.typing()
     msg = await message.answer("секундочку 🐾 ...")
-    answer = await model.answer(message.text)
-    await message.reply(answer)
-    await msg.delete()
+    async with state.proxy() as data:
+        history = data.get("history", [])
+        answer = await model.answer_with_history(message.text, history)
+        await message.reply(answer)
+        await save_history(data, [message.text, answer])
+        await msg.delete()
 
 
+@dp.message_handler(commands=["ask"])
 @dp.message_handler(IsReplyFilter(True))
 @dp.throttled(on_message_spam, rate=THROTTLE_RATE_MESSAGE)
-async def reply_to_message_in_chat(message: types.Message, model: AsyncMotyaModel):
-    replied_id = message.reply_to_message.from_id
-    if replied_id == bot.id or replied_id == -1001928224337:
-        replied_text = message.reply_to_message.text
-        await types.ChatActions.typing()
-        answer = await model.answer(f"Ты писал про: {replied_text}. Ответь на: {message.text}")
+async def reply_to_question_in_chat(message: types.Message, model: AsyncMotyaModel, state: FSMContext):
+    if message.get_command():
+        message.text = message.get_args()
+        if not message.text:
+            await message.reply("на что вы хотите чтобы я ответил? 🤓")
+            return    
+
+    await types.ChatActions.typing()
+    async with state.proxy() as data:
+        history = data.get("history", [])
+        answer = await model.answer_with_history(message.text, history)
         await message.reply(answer)
+        await save_history(data, [message.text, answer])
 
 
 async def basic_error(update: types.Update, error_msg: str):

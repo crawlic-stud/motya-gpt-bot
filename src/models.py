@@ -30,3 +30,18 @@ class Prompt(NamedTuple):
 class UserConfig(NamedTuple):
     resolution: Resolution = Resolution()
     style: str = ""
+
+
+class CappedList(list):
+    def __init__(self, messages: list[str] = None, max_store: int = 5):
+        super().__init__()
+        self.max_store = max_store
+
+        messages = messages if messages else []
+        for msg in messages:
+            self.add_message(msg)
+
+    def add_message(self, message: str):
+        if len(self) >= self.max_store:
+            self.pop(0)
+        self.append(message)
