@@ -21,7 +21,7 @@ from models import Prompt, Resolution, CappedList
 
 
 THROTTLE_RATE_IMAGE = 5
-CHAT_HISTORY_SIZE = 5
+CHAT_HISTORY_SIZE = 10
 THROTTLE_RATE_MESSAGE = 1
 MAX_IMAGE_SIZE = 2048
 MAX_CAPTION_SIZE = 1024
@@ -87,7 +87,8 @@ async def on_startup(dp: Dispatcher):
     basic_commands = [
         types.BotCommand("start", "Поприветствовать Мотю"),
         types.BotCommand("draw", "Нарисовать картинку по запросу"),
-        types.BotCommand("ask", "Спросить у бота что угодно (функция для чатов)"),
+        types.BotCommand("ask", "Задать вопрос боту (для чатов)"),
+        types.BotCommand("clear", "Очистить историю сообщений с ботом"),
         types.BotCommand("style", "Поставить стандартный стиль картинок"),
         types.BotCommand("res", "Поставить стандартное разрешение картинок"),
     ] 
@@ -243,6 +244,13 @@ async def test(message: types.Message, model: AsyncMotyaModel):
 async def save_history(data, messages: list[str]):
     history = CappedList([*data.get("history", []), *messages], max_store=CHAT_HISTORY_SIZE)
     data["history"] = history
+
+
+@dp.message_handler(commands=["clear"])
+async def reset_history(message: types.Message, state: FSMContext):
+    async with state.proxy() as data:
+        data["history"] = []
+    await message.reply("отчистил историю сообщений 🫡")
 
 
 @dp.message_handler(ChatTypeFilter(types.ChatType.PRIVATE))
