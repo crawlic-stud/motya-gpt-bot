@@ -67,7 +67,7 @@ class AsyncMotyaModel:
         return result[0]
 
     def prepare_dialog(self, history: list[str], step: int, max_steps: int):
-        dialog = "; ".join(history)
+        dialog = "\n".join(f"-{line}" for line in history)
         logger.info(f"History length: {max_steps - step + 1}")
         if len(dialog) < MAX_HISTORY_LENGTH:
             return dialog
@@ -77,8 +77,11 @@ class AsyncMotyaModel:
 
     async def answer_with_history(self, text: str, history: list[str], model_name: str = MAIN_MODEL) -> str:
         dialog = self.prepare_dialog(history, 1, len(history))
-        prompt = f"Ответь на сообщение, учитывая историю диалога. Сообщение: {text}. Диалог: {dialog}"
-        result = await self.answer(prompt, model_name)
+        if dialog:
+            prompt = f"Ответь на сообщение, учитывая историю диалога. Сообщение: {text}. Диалог:\n{dialog}"
+            result = await self.answer(prompt, model_name)
+        else:
+            result = await self.answer(text, model_name)
         return result
 
     async def get_inspirations(self, theme: str) -> list[str]:
