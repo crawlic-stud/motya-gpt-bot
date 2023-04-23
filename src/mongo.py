@@ -80,5 +80,11 @@ class UserConfigDb(MongoDatabase):
         )
 
 
-class ChatHistoryDb(MongoDatabase):
-    ...
+class NewsHistoryDb(MongoDatabase):
+    def add_article_url(self, url: str) -> None:
+        self.client.insert_one(
+            {"url": url}
+        )
+
+    def get_excluded_urls(self) -> list[str]:
+        return [article["url"] for article in self.get_all()]

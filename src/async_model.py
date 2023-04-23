@@ -10,6 +10,7 @@ import asyncio
 from dataclasses import dataclass
 
 from image_gen import ImageGenerator
+from news_parser import NewsParser
 from models import Prompt, Post
 
 
@@ -37,9 +38,14 @@ class AsyncMotyaModel:
     def __init__(self) -> None:
         self.pool: _PoolContextManager | None = None
         self.image_gen: ImageGenerator | None = None
+        self.news_parser: NewsParser | None = None
 
     @classmethod
-    async def create(cls, image_gen: ImageGenerator | None = None):
+    async def create(
+        cls, 
+        image_gen: ImageGenerator | None = None,
+        news_parser: NewsParser | None = None 
+    ):
         instance = cls()
         instance.pool = await aiomysql.create_pool(
             host="cloud.mindsdb.com",
@@ -47,6 +53,7 @@ class AsyncMotyaModel:
             password=os.getenv("PASSWORD"),
         )
         instance.image_gen = image_gen
+        instance.news_parser = news_parser
         return instance
     
     def __del__(self):
@@ -67,7 +74,7 @@ class AsyncMotyaModel:
         return result[0]
 
     def prepare_dialog(self, history: list[str], step: int, max_steps: int):
-        dialog = "; ".join(history)
+        dialog = "\n".join(f"-{line}" for line in history)
         logger.info(f"History length: {max_steps - step + 1}")
         if len(dialog) < MAX_HISTORY_LENGTH:
             return dialog
@@ -77,8 +84,11 @@ class AsyncMotyaModel:
 
     async def answer_with_history(self, text: str, history: list[str], model_name: str = MAIN_MODEL) -> str:
         dialog = self.prepare_dialog(history, 1, len(history))
-        prompt = f"Ответь на сообщение, учитывая историю диалога. Сообщение: {text}. Диалог: {dialog}"
-        result = await self.answer(prompt, model_name)
+        if dialog:
+            prompt = f"Ответь на сообщение, учитывая историю диалога. Сообщение: {text}. Диалог:\n{dialog}"
+            result = await self.answer(prompt, model_name)
+        else:
+            result = await self.answer(text, model_name)
         return result
 
     async def get_inspirations(self, theme: str) -> list[str]:
@@ -93,6 +103,21 @@ class AsyncMotyaModel:
         theme = random.choice(themes)
         inspiration = random.choice(await self.get_inspirations(theme)).strip()
         return inspiration
+
+    async def get_random_article_description(self, excluded_links: list[str]) -> tuple[str, str]:
+        logger.info(f"Getting article from {self.news_parser.BASE_URL}")
+        link = await self.news_parser.get_latest_link(excluded_links)
+        logger.info(f"Article URL: {link}")
+
+        article_description = await self.answer(
+            f"опиши новость в позитивной манере по ссылке: {link}. " 
+            f"в самом начале укажи заголовок статьи в формате: <b>заголовок</b>. " 
+            f"напиши что это ежедневная рубрика позитивная новость дня. " 
+            f"напиши 3 ключевых факта из статьи, которые тебя зацепили. "
+            f"не надо писать ничего про себя, только про новость. "
+            f"в конце добавь ссылку на новость в формате: <a href='ссылка'>тут</a>."
+        )
+        return article_description, link
 
     async def reset_model(self, prompt, model_name: str = MAIN_MODEL) -> None:
         try:
