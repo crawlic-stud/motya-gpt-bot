@@ -80,5 +80,5 @@ class UserConfigDb(MongoDatabase):
         )
 
 
-class ChatHistoryDb(MongoDatabase):
+class NewsHistoryDb(MongoDatabase):
     ...

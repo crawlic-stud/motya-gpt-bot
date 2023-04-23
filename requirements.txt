@@ -8,3 +8,4 @@ pymongo[srv]
 motor
 pytest
 pytest-asyncio
+bs4

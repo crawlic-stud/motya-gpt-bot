@@ -10,6 +10,7 @@ import asyncio
 from dataclasses import dataclass
 
 from image_gen import ImageGenerator
+from news_parser import NewsParser
 from models import Prompt, Post
 
 
@@ -37,9 +38,14 @@ class AsyncMotyaModel:
     def __init__(self) -> None:
         self.pool: _PoolContextManager | None = None
         self.image_gen: ImageGenerator | None = None
+        self.news_parser: NewsParser | None = None
 
     @classmethod
-    async def create(cls, image_gen: ImageGenerator | None = None):
+    async def create(
+        cls, 
+        image_gen: ImageGenerator | None = None,
+        news_parser: NewsParser | None = None 
+    ):
         instance = cls()
         instance.pool = await aiomysql.create_pool(
             host="cloud.mindsdb.com",
@@ -47,6 +53,7 @@ class AsyncMotyaModel:
             password=os.getenv("PASSWORD"),
         )
         instance.image_gen = image_gen
+        instance.news_parser = news_parser
         return instance
     
     def __del__(self):
