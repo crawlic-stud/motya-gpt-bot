@@ -15,8 +15,9 @@ import aioschedule
 
 from async_model import AsyncMotyaModel
 from model_middleware import ModelMiddleware
-from mongo import BotConfigDb, UserConfigDb
+from mongo import BotConfigDb, UserConfigDb, NewsHistoryDb
 from image_gen import ImageGenerator, ImageGenerationError
+from news_parser import NewsParser, NewsParserError
 from models import Prompt, Resolution, CappedList
 
 
@@ -39,6 +40,7 @@ bot = Bot(TOKEN, parse_mode="HTML")
 dp = Dispatcher(bot, storage=MongoStorage(uri=MONGO_URL, db_name=DB_NAME))
 bot_config_db = BotConfigDb(MONGO_URL, DB_NAME, "config")
 user_config_db = UserConfigDb(MONGO_URL, DB_NAME, "user_config")
+news_history_db = NewsHistoryDb(MONGO_URL, DB_NAME, "news_history")
 logger = logging.getLogger("bot")
 
 
@@ -71,9 +73,20 @@ async def send_post(model: AsyncMotyaModel, group: str | int = None):
         await bot.send_message(group, post.text)
 
 
+async def send_news(model: AsyncMotyaModel, group: str | int = None):
+    excluded_urls = news_history_db.get_excluded_urls()
+    post_text, url = await model.get_random_article_description(excluded_urls)
+
+    group = GROUP_NAME if not group else group
+
+    await bot.send_message(group, post_text)
+    news_history_db.add_article_url(url)
+
+
 async def posts_loop(model: AsyncMotyaModel):
-    for time in ["8:10", "11:50", "14:05", "16:45", "19:05"]:
+    for time in ["11:50", "14:05", "16:45", "19:05"]:
         aioschedule.every().day.at(time).do(send_post, model, None)
+    aioschedule.every().day.at("8:10").do(send_news, model, None)
     while True:
         await aioschedule.run_pending()
         await asyncio.sleep(1)
@@ -81,7 +94,8 @@ async def posts_loop(model: AsyncMotyaModel):
 
 async def on_startup(dp: Dispatcher):
     image_gen = ImageGenerator()
-    motya = await AsyncMotyaModel.create(image_gen)
+    news_parser = NewsParser()
+    motya = await AsyncMotyaModel.create(image_gen, news_parser)
     dp.middleware.setup(ModelMiddleware(motya))
     asyncio.create_task(posts_loop(motya))
     basic_commands = [
@@ -238,7 +252,8 @@ async def prompt(message: types.Message):
 
 @dp.message_handler(IDFilter(ADMIN_ID), commands=["test"])
 async def test(message: types.Message, model: AsyncMotyaModel):
-    await send_post(model, message.from_id)
+    # await send_post(model, message.from_id)
+    await send_news(model, message.from_id)
 
 
 async def save_history(data, messages: list[str]):

@@ -104,6 +104,21 @@ class AsyncMotyaModel:
         inspiration = random.choice(await self.get_inspirations(theme)).strip()
         return inspiration
 
+    async def get_random_article_description(self, excluded_links: list[str]) -> tuple[str, str]:
+        logger.info(f"Getting article from {self.news_parser.BASE_URL}")
+        link = await self.news_parser.get_latest_link(excluded_links)
+        logger.info(f"Article URL: {link}")
+
+        article_description = await self.answer(
+            f"опиши новость в позитивной манере по ссылке: {link}. " 
+            f"в самом начале укажи заголовок статьи в формате: <b>заголовок</b>. " 
+            f"напиши что это ежедневная рубрика позитивная новость дня. " 
+            f"напиши 3 ключевых факта из статьи, которые тебя зацепили. "
+            f"не надо писать ничего про себя, только про новость. "
+            f"в конце добавь ссылку на новость в формате: <a href='ссылка'>тут</a>."
+        )
+        return article_description, link
+
     async def reset_model(self, prompt, model_name: str = MAIN_MODEL) -> None:
         try:
             await self._execute(f"DROP TABLE {model_name}")

@@ -1,5 +1,6 @@
 from typing import NamedTuple
 import asyncio
+from datetime import datetime
 
 import aiohttp
 from bs4 import BeautifulSoup
@@ -7,6 +8,11 @@ from bs4 import BeautifulSoup
 
 class NewsParserError(Exception):
     ...
+
+
+class Article(NamedTuple):
+    link: str
+    dt: datetime
 
 
 class NewsParser:
@@ -28,8 +34,13 @@ class NewsParser:
                 html = await response.text()
                 soup = BeautifulSoup(html, "html.parser")
 
-                a_tags = soup.select(".post-title > a")
-                hrefs = [a["href"] for a in a_tags]
+                a_tags = soup.select(".post-title a")
+                times = soup.select(".entry-date")
+                
+                hrefs = []
+                for t in times:
+                    href = t.parent["href"]
+                    hrefs.append(href) if href not in hrefs else ...
 
                 latest_link = hrefs.pop(0) if hrefs else None
                 while latest_link in excluded_links and hrefs:
