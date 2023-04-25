@@ -317,7 +317,6 @@ async def basic_error(update: types.Update, error_msg: str):
         await update.message.reply(error_msg)
     except Exception as e:
         logger.error(e)
-        pass
     finally:
         return True 
 
