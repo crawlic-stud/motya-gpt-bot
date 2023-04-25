@@ -6,11 +6,11 @@ import random
 import logging
 
 from aiogram import types, Bot, Dispatcher
-from aiogram.contrib.fsm_storage.memory import MemoryStorage
 from aiogram.contrib.fsm_storage.mongo import MongoStorage
 from aiogram.dispatcher.filters import ChatTypeFilter, IsReplyFilter, IDFilter
 from aiogram.dispatcher.storage import FSMContext
 from aiohttp.client_exceptions import ClientConnectionError
+from pymysql.err import ProgrammingError
 import aioschedule
 
 from async_model import AsyncMotyaModel
@@ -330,6 +330,11 @@ async def generation_error(update: types.Update, error):
 @dp.errors_handler(exception=ClientConnectionError)
 async def connection_error(update: types.Update, error):
     await basic_error(update, f"не могу найти свой карандаш и краски 😭")
+
+
+@dp.errors_handler(exception=ProgrammingError)
+async def retry_limit_error(update: types.Update, error):
+    await basic_error(update, f"ошибка 😖 пожалуйста, очистите историю сообщений с помощью команды /clear 🥺")
 
 
 if __name__ == "__main__":
