@@ -76,6 +76,7 @@ async def send_post(model: AsyncMotyaModel, group: str | int = None):
 async def send_news(model: AsyncMotyaModel, group: str | int = None):
     excluded_urls = news_history_db.get_excluded_urls()
     post_text, url = await model.get_random_article_description(excluded_urls)
+    post_text = f"{post_text}\n\n#новостиотмоти"
 
     group = GROUP_NAME if not group else group
 

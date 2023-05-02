@@ -7,7 +7,6 @@ import logging
 import os
 import random
 import asyncio
-from dataclasses import dataclass
 
 from image_gen import ImageGenerator
 from news_parser import NewsParser
@@ -21,6 +20,7 @@ MAX_HISTORY_LENGTH = MAX_TOKENS // 2
 MAIN_MODEL = "mindsdb.motya_model"
 THEME_MODEL = "mindsdb.motya_helper"
 PIC_MODEL = "mindsdb.pic_helper"
+MODELS = [MAIN_MODEL, THEME_MODEL, PIC_MODEL]
 
 
 def retry_policy(info: RetryInfo):
