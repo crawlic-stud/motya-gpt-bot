@@ -29,6 +29,7 @@ MAX_CAPTION_SIZE = 1024
 BLOG_ID = "Telegram"
 GROUP_NAME = "@motya_blog"
 DEFAULT_PROMPT = Prompt("")
+IMAGE_CAPTION = "готово 🎨🐾"
 
 TOKEN = os.getenv("TG_TOKEN")
 ADMIN_ID = int(os.getenv("ADMIN_ID"))
@@ -214,14 +215,15 @@ async def send_image(message: types.Message, model: AsyncMotyaModel):
     if prompt.is_default():
         prompt = Prompt(prompt.text, user_conf.style, user_conf.resolution)
 
+    user_config_db.set_last_image(message.from_id, prompt.description)
     msg = await message.answer("рисую ✏️🐾 ...")
     image_bytes = await model.image_gen.get_images([prompt])
     file_ = types.InputFile(io.BytesIO(image_bytes[0]), f"{prompt.text}.png")
     
     if prompt.resolution == DEFAULT_PROMPT.resolution:
-        await message.reply_photo(file_, caption=f'готово 🎨🐾')
+        await message.reply_photo(file_, caption=IMAGE_CAPTION)
     else:
-        await message.reply_document(file_, caption=f'готово 🎨🐾')
+        await message.reply_document(file_, caption=IMAGE_CAPTION)
     
     await msg.delete()
 
@@ -292,11 +294,36 @@ async def reply_to_question_in_chat(message: types.Message, model: AsyncMotyaMod
         await save_history(data, [message.text, answer])
 
 
+async def reply_to_one_message(message: types.Message, model: AsyncMotyaModel, state: FSMContext):
+    logger.info(f"Answering to one message from {message.from_id} in chat {message.chat.id}")
+    await types.ChatActions.typing()
+    answer = await model.answer(f"ты писал про: {message.reply_to_message.text}, ответь на: {message.text}")
+    await message.reply(answer)
+    async with state.proxy() as data:
+        await save_history(data, [message.text, answer])
+
+
+async def reply_to_drawing(message: types.Message, model: AsyncMotyaModel, state: FSMContext):
+    logger.info(f"Answering to drawing from {message.from_id} in chat {message.chat.id}")
+    await types.ChatActions.typing()
+    config = user_config_db.get_user_config(message.from_id)
+    answer = await model.answer(f"ты нарисовал рисунок по запросу: '{config.last_image}', ответь на: {message.text}")
+    await message.reply(answer)
+    async with state.proxy() as data:
+        await save_history(data, [message.text, answer])
+    
+
 @dp.message_handler(IsReplyFilter(True))
 @dp.throttled(on_message_spam, rate=THROTTLE_RATE_MESSAGE)
 async def handle_reply_in_chat(message: types.Message, model: AsyncMotyaModel, state: FSMContext):
     reply_from_user = message.reply_to_message.from_user
     if reply_from_user.id != bot.id and reply_from_user.full_name != BLOG_ID:
+        return
+    elif reply_from_user.full_name == BLOG_ID:
+        await reply_to_one_message(message, model, message.reply_to_message)        
+        return
+    elif message.reply_to_message.caption is not None:
+        await reply_to_drawing(message, model, message.reply_to_message)
         return
     await reply_to_question_in_chat(message, model, state)
 

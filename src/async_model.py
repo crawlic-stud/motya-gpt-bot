@@ -49,8 +49,8 @@ class AsyncMotyaModel:
         instance = cls()
         instance.pool = await aiomysql.create_pool(
             host="cloud.mindsdb.com",
-            user=os.getenv("USER"),
-            password=os.getenv("PASSWORD"),
+            user=os.getenv("MINDS_DB_USER"),
+            password=os.getenv("MINDS_DB_PASSWORD"),
         )
         instance.image_gen = image_gen
         instance.news_parser = news_parser
@@ -85,7 +85,7 @@ class AsyncMotyaModel:
     async def answer_with_history(self, text: str, history: list[str], model_name: str = MAIN_MODEL) -> str:
         dialog = self.prepare_dialog(history, 1, len(history))
         if dialog:
-            prompt = f"Ответь на сообщение, учитывая историю диалога. Сообщение: {text}. Диалог:\n{dialog}"
+            prompt = f"Ответь на сообщение, учитывая контекст диалога. Сообщение: {text}. Диалог:\n'''\n{dialog}'''"
             result = await self.answer(prompt, model_name)
         else:
             result = await self.answer(text, model_name)
