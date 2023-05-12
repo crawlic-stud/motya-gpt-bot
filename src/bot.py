@@ -77,6 +77,7 @@ async def send_post(model: AsyncMotyaModel, group: str | int = None):
 async def send_news(model: AsyncMotyaModel, group: str | int = None):
     excluded_urls = news_history_db.get_excluded_urls()
     post_text, url = await model.get_random_article_description(excluded_urls)
+    post_text = f"{post_text}\n\n#новостиотмоти"
 
     group = GROUP_NAME if not group else group
 
@@ -344,7 +345,6 @@ async def basic_error(update: types.Update, error_msg: str):
         await update.message.reply(error_msg)
     except Exception as e:
         logger.error(e)
-        pass
     finally:
         return True 
 
