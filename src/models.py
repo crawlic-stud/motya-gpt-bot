@@ -26,10 +26,15 @@ class Prompt(NamedTuple):
     def is_default(self):
         return not self.style and self.resolution == Resolution()
 
+    @property
+    def description(self):
+        return f"{self.text} {self.style}"
+    
 
 class UserConfig(NamedTuple):
     resolution: Resolution = Resolution()
     style: str = ""
+    last_image: str = ""
 
 
 class CappedList(list):
