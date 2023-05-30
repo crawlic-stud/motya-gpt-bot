@@ -2,7 +2,7 @@ from aiogram.dispatcher.handler import ctx_data
 from aiogram import types
 from aiogram.dispatcher.middlewares import BaseMiddleware
 
-from async_model import AsyncMotyaModel
+from model.async_model import AsyncMotyaModel
 
 
 class ModelMiddleware(BaseMiddleware):

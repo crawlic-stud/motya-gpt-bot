@@ -13,7 +13,7 @@ from aiohttp.client_exceptions import ClientConnectionError
 from pymysql.err import ProgrammingError
 import aioschedule
 
-from async_model import AsyncMotyaModel
+from model.async_model import AsyncMotyaModel
 from model_middleware import ModelMiddleware
 from mongo import BotConfigDb, UserConfigDb, NewsHistoryDb
 from image_gen import ImageGenerator, ImageGenerationError

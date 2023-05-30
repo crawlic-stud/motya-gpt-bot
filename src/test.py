@@ -6,7 +6,7 @@ import asyncio
 from dotenv import load_dotenv
 import pytest
 
-from async_model import AsyncMotyaModel
+from model.async_model import AsyncMotyaModel
 from mongo import BotConfigDb
 from models import CappedList
 

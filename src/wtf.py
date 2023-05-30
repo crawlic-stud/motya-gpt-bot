@@ -4,7 +4,7 @@ from aiogram.types import InputFile
 from dotenv import load_dotenv
 
 from bot import bot, bot_config_db
-from async_model import AsyncMotyaModel, THEME_MODEL, PIC_MODEL 
+from model.async_model import AsyncMotyaModel, THEME_MODEL, PIC_MODEL 
 
 
 async def recreate():

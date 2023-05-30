@@ -1,6 +1,6 @@
 import aiomysql
 from aiomysql.utils import _PoolContextManager
-from pymysql.err import ProgrammingError
+from pymysql.err import ProgrammingError, OperationalError
 from aioretry import retry, RetryInfo
 
 import logging
@@ -21,6 +21,7 @@ MAIN_MODEL = "mindsdb.motya_model"
 THEME_MODEL = "mindsdb.motya_helper"
 PIC_MODEL = "mindsdb.pic_helper"
 MODELS = [MAIN_MODEL, THEME_MODEL, PIC_MODEL]
+CONN_ERR_MSG = "не могу сейчас ответить, я в отпуске 😓 используй команду /draw, чтобы порисовать!"
 
 
 def retry_policy(info: RetryInfo):
@@ -31,6 +32,18 @@ def retry_policy(info: RetryInfo):
     elif isinstance(exc, IndexError):
         return info.fails >= MAX_FAILS, 0
     return True, 0
+
+
+async def _get_pool() -> _PoolContextManager | None:
+    try:
+        pool = await aiomysql.create_pool(
+            host="cloud.mindsdb.com",
+            user=os.getenv("MINDS_DB_USER"),
+            password=os.getenv("MINDS_DB_PASSWORD"),
+        )
+        return pool
+    except OperationalError:
+        return
 
 
 class AsyncMotyaModel:
@@ -47,11 +60,7 @@ class AsyncMotyaModel:
         news_parser: NewsParser | None = None 
     ):
         instance = cls()
-        instance.pool = await aiomysql.create_pool(
-            host="cloud.mindsdb.com",
-            user=os.getenv("MINDS_DB_USER"),
-            password=os.getenv("MINDS_DB_PASSWORD"),
-        )
+        instance.pool = await _get_pool()
         instance.image_gen = image_gen
         instance.news_parser = news_parser
         return instance
@@ -68,6 +77,8 @@ class AsyncMotyaModel:
 
     @retry(retry_policy=retry_policy)
     async def answer(self, text: str, model_name: str = MAIN_MODEL) -> str:
+        if self.pool is None:
+            return CONN_ERR_MSG
         text = text.replace('"', '')
         command = f'SELECT response from {model_name} WHERE text="{text}";'
         result = await self._execute(command)
