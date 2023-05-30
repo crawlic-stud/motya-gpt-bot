@@ -41,8 +41,10 @@ async def _get_pool() -> _PoolContextManager | None:
             user=os.getenv("MINDS_DB_USER"),
             password=os.getenv("MINDS_DB_PASSWORD"),
         )
+        logger.info("Connection to MindsDB - SUCCESS")
         return pool
     except OperationalError:
+        logger.warning("Connection to MindsDB - FAILED")
         return
 
 
