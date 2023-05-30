@@ -36,10 +36,13 @@ def retry_policy(info: RetryInfo):
 
 async def _get_pool() -> _PoolContextManager | None:
     try:
+        user, password = os.getenv("MINDS_DB_USER"), os.getenv("MINDS_DB_PASSWORD")
+        if user is None or password is None:
+            raise ValueError("No user or password provided for MindsDB")
         pool = await aiomysql.create_pool(
             host="cloud.mindsdb.com",
-            user=os.getenv("MINDS_DB_USER"),
-            password=os.getenv("MINDS_DB_PASSWORD"),
+            user=user,
+            password=password
         )
         logger.info("Connection to MindsDB - SUCCESS")
         return pool
