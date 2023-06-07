@@ -29,7 +29,7 @@ class Prompt(NamedTuple):
     @property
     def description(self):
         return f"{self.text} {self.style}"
-    
+
 
 class UserConfig(NamedTuple):
     resolution: Resolution = Resolution()
@@ -42,7 +42,7 @@ class CappedList(list):
         super().__init__()
         self.max_store = max_store
 
-        messages = messages if messages else []
+        messages = messages if messages is None else []
         for msg in messages:
             self.add_message(msg)
 
