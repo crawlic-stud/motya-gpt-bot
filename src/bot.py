@@ -17,8 +17,9 @@ from model.async_model import AsyncMotyaModel
 from model_middleware import ModelMiddleware
 from mongo import BotConfigDb, UserConfigDb, NewsHistoryDb
 from image_gen import ImageGenerator, ImageGenerationError
-from news_parser import NewsParser, NewsParserError
+from news_parser import NewsParser
 from models import Prompt, Resolution, CappedList
+from utils import create_media
 
 
 THROTTLE_RATE_IMAGE = 5
@@ -37,20 +38,11 @@ MONGO_URL = os.getenv("MONGO_URL")
 DB_NAME = "motya_gpt"
 
 bot = Bot(TOKEN, parse_mode="HTML")
-# dp = Dispatcher(bot, storage=MemoryStorage())
 dp = Dispatcher(bot, storage=MongoStorage(uri=MONGO_URL, db_name=DB_NAME))
 bot_config_db = BotConfigDb(MONGO_URL, DB_NAME, "config")
 user_config_db = UserConfigDb(MONGO_URL, DB_NAME, "user_config")
 news_history_db = NewsHistoryDb(MONGO_URL, DB_NAME, "news_history")
 logger = logging.getLogger("bot")
-
-
-def create_media(images: list[bytes], caption: str = None) -> types.MediaGroup:
-    media = types.MediaGroup()
-    media.attach_photo(types.InputFile(io.BytesIO((images[0])), "image.png"), caption)
-    for image in images[1:]:
-        media.attach_photo(types.InputFile(io.BytesIO(image), "image.png"))
-    return media
 
 
 async def send_post(model: AsyncMotyaModel, group: str | int = None):
@@ -63,7 +55,6 @@ async def send_post(model: AsyncMotyaModel, group: str | int = None):
     post = await model.create_random_post_with_images(themes, images, styles)
     if not images:
         await bot.send_message(group, post.text)
-        return
         
     if len(post.text) < MAX_CAPTION_SIZE:
         media = create_media(post.images, post.text)

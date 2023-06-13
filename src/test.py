@@ -1,7 +1,6 @@
 import os
 import random
 from string import ascii_letters
-import asyncio
 
 from dotenv import load_dotenv
 import pytest
