@@ -14,7 +14,7 @@ from models import Prompt, Post
 
 
 logger = logging.getLogger("model")
-MAX_FAILS = 20
+MAX_FAILS = 1
 MAX_TOKENS = 8192
 MAX_HISTORY_LENGTH = MAX_TOKENS // 2
 MAIN_MODEL = "mindsdb.motya_model"

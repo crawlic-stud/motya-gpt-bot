@@ -77,9 +77,9 @@ async def send_news(model: AsyncMotyaModel, group: str | int = None):
 
 
 async def posts_loop(model: AsyncMotyaModel):
-    for time in ["11:50", "14:05", "16:45", "19:05"]:
-        aioschedule.every().day.at(time).do(send_post, model, None)
-    aioschedule.every().day.at("8:10").do(send_news, model, None)
+    # for time in ["11:50", "14:05", "16:45", "19:05"]:
+    #     aioschedule.every().day.at(time).do(send_post, model, None)
+    # aioschedule.every().day.at("8:10").do(send_news, model, None)
     while True:
         await aioschedule.run_pending()
         await asyncio.sleep(1)
@@ -352,7 +352,8 @@ async def connection_error(update: types.Update, error):
 
 @dp.errors_handler(exception=ProgrammingError)
 async def retry_limit_error(update: types.Update, error):
-    await basic_error(update, f"ошибка 😖 пожалуйста, очистите историю сообщений с помощью команды /clear 🥺")
+    # await basic_error(update, f"ошибка 😖 пожалуйста, очистите историю сообщений с помощью команды /clear 🥺")
+    await basic_error(update, f"у меня пока что болит горло, не могу отвечать, лечусь 🥺\nно могу порисовать по команде /draw 🎨")
 
 
 if __name__ == "__main__":
