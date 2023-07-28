@@ -1,7 +1,9 @@
 import base64
 import asyncio
+import json
 import logging
 import os
+from typing import Any
 
 import aiohttp
 
@@ -9,11 +11,6 @@ from models import Prompt, Resolution
 
 
 logger = logging.getLogger("image_gen")
-PROXY_IP_PORT = os.getenv("PROXY_IP_PORT")
-PROXY_USER = os.getenv("PROXY_USER")
-PROXY_PASSWORD = os.getenv("PROXY_PASSWORD")
-# PROXY = f"https://{PROXY_USER}:{PROXY_PASSWORD}@{PROXY_IP_PORT}"
-PROXY = None
 
 
 def create_headers():
@@ -30,11 +27,10 @@ class ImageGenerationError(Exception):
 
 
 class ImageGenerator:
-    REQUEST_STATUS_DELAY_S = 2
+    REQUEST_STATUS_DELAY_S = 10
     MAX_RETRIES = 50
-    RUN_URL = "https://fusionbrain.ai/api/v1/text2image/run"
-    STATUS_URL = "https://fusionbrain.ai/api/v1/text2image/inpainting/pockets/{pocket_id}/status"
-    ENTITIES_URL = "https://fusionbrain.ai/api/v1/text2image/inpainting/pockets/{pocket_id}/entities"
+    RUN_URL = "https://api.fusionbrain.ai/web/api/v1/text2image/run?model_id=1"
+    STATUS_URL = "https://api.fusionbrain.ai/web/api/v1/text2image/status/{pocket_id}"
 
     def __init__(self) -> None:
         self.headers = create_headers()
@@ -49,49 +45,42 @@ class ImageGenerator:
         session: aiohttp.ClientSession,
         prompt: Prompt,
     ) -> str:
+        data = {
+            "type": "GENERATE",
+            "style": "DEFAULT",
+            "width": prompt.resolution.width,
+            "height": prompt.resolution.height,
+            "generateParams": {"query": f"{prompt.text}, {prompt.style}"}
+        }
+        form_data = aiohttp.FormData()
+        form_data.add_field("params", json.dumps(data),
+                            content_type="application/json", filename="blob")
         async with session.post(
             self.RUN_URL,
-            json={
-                "queueType": "generate",
-                "query": prompt.text,
-                "preset": "1",
-                "style": prompt.style,
-                "width": prompt.resolution.width,
-                "height": prompt.resolution.height,
-            },
-            # proxy=PROXY
+            data=form_data
         ) as response:
             await self._process_response(response, 201)
             data = await response.json()
-            pocket_id = data["result"]["pocketId"]
+            pocket_id = data["uuid"]
             logger.info(f"Got {pocket_id=}")
             return pocket_id
 
-    async def _check_status(self, session: aiohttp.ClientSession, pocket_id: str) -> bool:
+    async def _check_images(self, session: aiohttp.ClientSession, pocket_id: str) -> list[str] | None:
         url = self.STATUS_URL.format(pocket_id=pocket_id)
         async with session.get(
             url,
-            # proxy=PROXY
         ) as response:
             await self._process_response(response)
             data = await response.json()
-            status_str = data["result"]
+            status_str = data["status"]
             logger.info(
                 f"WAITING: status = {status_str}, delay = {self.REQUEST_STATUS_DELAY_S} s")
-            return status_str == "SUCCESS"
+            return data["images"]
 
-    async def _get_image_bytes(self, session: aiohttp.ClientSession, pocket_id: str) -> bytes:
-        url = self.ENTITIES_URL.format(pocket_id=pocket_id)
-        async with session.get(
-            url,
-            # proxy=PROXY
-        ) as response:
-            await self._process_response(response)
-            data = await response.json()
-            image_bytes = data["result"][0]["response"][0]
-            image_bytes = base64.b64decode(image_bytes)
-            logger.info("Got image bytes")
-            return image_bytes
+    async def _get_image_bytes(self, base64_string: str) -> bytes:
+        image_bytes = base64.b64decode(base64_string)
+        logger.info("Got image bytes")
+        return image_bytes
 
     async def _get_image(
         self,
@@ -99,15 +88,15 @@ class ImageGenerator:
         prompt: Prompt,
     ) -> bytes:
         pocket_id = await self._get_pocket_id(session, prompt)
-        status = await self._check_status(session, pocket_id)
+        images = await self._check_images(session, pocket_id)
         retries = 0
-        while not status and retries <= self.MAX_RETRIES:
+        while not images and retries <= self.MAX_RETRIES:
             await asyncio.sleep(self.REQUEST_STATUS_DELAY_S)
             retries += 1
-            status = await self._check_status(session, pocket_id)
-        if not status or retries > self.MAX_RETRIES:
+            images = await self._check_images(session, pocket_id)
+        if not images or retries > self.MAX_RETRIES:
             raise ImageGenerationError("Server is not responding.")
-        image_bytes = await self._get_image_bytes(session, pocket_id)
+        image_bytes = await self._get_image_bytes(images[0])
         return image_bytes
 
     async def get_images(self, prompts: list[Prompt]) -> list[bytes]:
@@ -123,16 +112,17 @@ async def main():
     image_gen = ImageGenerator()
     logging.basicConfig(level=logging.INFO)
     async with aiohttp.ClientSession(headers=image_gen.headers) as session:
-        prompt = "милая девушка татарка с узкими зелеными глазами и широким лицом, маленьким носиком, глазами с макияжем, оранжевые светлые волосы, с букетом азалии в руках"
-        image_bytes = await image_gen._get_image(
-            session, Prompt(
-                prompt, 
-                "A portrait of a 20 years old woman with green eyes in a white, flowy dress, standing in a field of wildflowers with the sun setting behind her",
-                Resolution(768, 1024)
+        prompt = "собачка"
+        for i in range(1):
+            image_bytes = await image_gen._get_image(
+                session, Prompt(
+                    prompt,
+                    "нарисовано цветными карандашами",
+                    Resolution(1024, 1024)
+                )
             )
-        )
-        with open(f"pics/{prompt}.png", "wb") as f:
-            f.write(image_bytes)
+            with open(f"test.png", "wb") as f:
+                f.write(image_bytes)
 
 
 if __name__ == "__main__":

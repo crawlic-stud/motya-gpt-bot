@@ -1,7 +1,7 @@
 from typing import NamedTuple
 from dataclasses import dataclass
 
-DEFAULT_SIZE = 768
+DEFAULT_SIZE = 1024
 
 
 @dataclass

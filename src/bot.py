@@ -25,7 +25,7 @@ from utils import create_media
 THROTTLE_RATE_IMAGE = 5
 CHAT_HISTORY_SIZE = 10
 THROTTLE_RATE_MESSAGE = 1
-MAX_IMAGE_SIZE = 2048
+MAX_IMAGE_SIZE = 1024
 MAX_CAPTION_SIZE = 1024
 BLOG_ID = "Telegram"
 GROUP_NAME = "@motya_blog"
@@ -47,7 +47,7 @@ logger = logging.getLogger("bot")
 
 async def send_post(model: AsyncMotyaModel, group: str | int = None):
     themes = bot_config_db.get_themes()
-    styles = bot_config_db.get_image_styles()    
+    styles = bot_config_db.get_image_styles()
     images = random.choice([1, 3])
 
     group = GROUP_NAME if not group else group
@@ -55,7 +55,7 @@ async def send_post(model: AsyncMotyaModel, group: str | int = None):
     post = await model.create_random_post_with_images(themes, images, styles)
     if not images:
         await bot.send_message(group, post.text)
-        
+
     if len(post.text) < MAX_CAPTION_SIZE:
         media = create_media(post.images, post.text)
         await bot.send_media_group(group, media)
@@ -77,9 +77,9 @@ async def send_news(model: AsyncMotyaModel, group: str | int = None):
 
 
 async def posts_loop(model: AsyncMotyaModel):
-    # for time in ["11:50", "14:05", "16:45", "19:05"]:
-    #     aioschedule.every().day.at(time).do(send_post, model, None)
-    # aioschedule.every().day.at("8:10").do(send_news, model, None)
+    for time in ["11:50", "14:05", "16:45", "19:05"]:
+        aioschedule.every().day.at(time).do(send_post, model, None)
+    aioschedule.every().day.at("8:10").do(send_news, model, None)
     while True:
         await aioschedule.run_pending()
         await asyncio.sleep(1)
@@ -98,7 +98,7 @@ async def on_startup(dp: Dispatcher):
         types.BotCommand("clear", "Очистить историю сообщений с ботом"),
         types.BotCommand("style", "Поставить стандартный стиль картинок"),
         types.BotCommand("res", "Поставить стандартное разрешение картинок"),
-    ] 
+    ]
     await bot.set_my_commands(basic_commands)
     await bot.set_my_commands(
         [
@@ -134,12 +134,14 @@ def validate_resolution(res: list[str]) -> Resolution:
     if len(res) == 2 and all(isinstance(item, int) for item in res):
         return Resolution(*res)
     elif len(res) != 2 or not all(item.isdigit() for item in res):
-        raise ImageGenerationError(f"нужно ввести ширину и высоту изображения двумя числами 🫣")
+        raise ImageGenerationError(
+            f"нужно ввести ширину и высоту изображения двумя числами 🫣")
 
     w, h = [int(item) for item in res]
     if w > MAX_IMAGE_SIZE or h > MAX_IMAGE_SIZE:
-        raise ImageGenerationError(f"разрешение картинки не может быть больше чем {MAX_IMAGE_SIZE}x{MAX_IMAGE_SIZE} пикселей 🙄") 
-    
+        raise ImageGenerationError(
+            f"разрешение картинки не может быть больше чем {MAX_IMAGE_SIZE}x{MAX_IMAGE_SIZE} пикселей 🙄")
+
     return Resolution(w, h)
 
 
@@ -148,16 +150,16 @@ def parse_args(args: str) -> Prompt | None:
     parser = argparse.ArgumentParser()
     parser.add_argument("text", nargs="*")
     parser.add_argument(
-        "-style", "-s", 
-        nargs="*", 
-        type=str, 
-        help="style of image", 
+        "-style", "-s",
+        nargs="*",
+        type=str,
+        help="style of image",
         default=DEFAULT_PROMPT.style
     )
     parser.add_argument(
-        "-res", "-r", 
-        nargs="*", 
-        help="image resolution", 
+        "-res", "-r",
+        nargs="*",
+        help="image resolution",
         default=DEFAULT_PROMPT.resolution
     )
     args, _ = parser.parse_known_args(args)
@@ -191,7 +193,7 @@ async def set_style(message: types.Message):
 
 
 @dp.message_handler(commands=["draw"])
-@dp.throttled(on_draw_spam ,rate=THROTTLE_RATE_IMAGE)
+@dp.throttled(on_draw_spam, rate=THROTTLE_RATE_IMAGE)
 async def send_image(message: types.Message, model: AsyncMotyaModel):
     prompt = parse_args(message.get_args())
     if not prompt:
@@ -211,12 +213,12 @@ async def send_image(message: types.Message, model: AsyncMotyaModel):
     msg = await message.answer("рисую ✏️🐾 ...")
     image_bytes = await model.image_gen.get_images([prompt])
     file_ = types.InputFile(io.BytesIO(image_bytes[0]), f"{prompt.text}.png")
-    
+
     if prompt.resolution == DEFAULT_PROMPT.resolution:
         await message.reply_photo(file_, caption=IMAGE_CAPTION)
     else:
         await message.reply_document(file_, caption=IMAGE_CAPTION)
-    
+
     await msg.delete()
 
 
@@ -251,7 +253,8 @@ async def test(message: types.Message, model: AsyncMotyaModel):
 
 
 async def save_history(data, messages: list[str]):
-    history = CappedList([*data.get("history", []), *messages], max_store=CHAT_HISTORY_SIZE)
+    history = CappedList(
+        [*data.get("history", []), *messages], max_store=CHAT_HISTORY_SIZE)
     data["history"] = history
 
 
@@ -287,7 +290,8 @@ async def reply_to_question_in_chat(message: types.Message, model: AsyncMotyaMod
 
 
 async def reply_to_one_message(message: types.Message, model: AsyncMotyaModel, state: FSMContext):
-    logger.info(f"Answering to one message from {message.from_id} in chat {message.chat.id}")
+    logger.info(
+        f"Answering to one message from {message.from_id} in chat {message.chat.id}")
     await types.ChatActions.typing()
     answer = await model.answer(f"ты писал про: {message.reply_to_message.text}, ответь на: {message.text}")
     await message.reply(answer)
@@ -296,14 +300,15 @@ async def reply_to_one_message(message: types.Message, model: AsyncMotyaModel, s
 
 
 async def reply_to_drawing(message: types.Message, model: AsyncMotyaModel, state: FSMContext):
-    logger.info(f"Answering to drawing from {message.from_id} in chat {message.chat.id}")
+    logger.info(
+        f"Answering to drawing from {message.from_id} in chat {message.chat.id}")
     await types.ChatActions.typing()
     config = user_config_db.get_user_config(message.from_id)
     answer = await model.answer(f"ты нарисовал рисунок по запросу: '{config.last_image}', ответь на: {message.text}")
     await message.reply(answer)
     async with state.proxy() as data:
         await save_history(data, [message.text, answer])
-    
+
 
 @dp.message_handler(IsReplyFilter(True))
 @dp.throttled(on_message_spam, rate=THROTTLE_RATE_MESSAGE)
@@ -312,7 +317,7 @@ async def handle_reply_in_chat(message: types.Message, model: AsyncMotyaModel, s
     if reply_from_user.id != bot.id and reply_from_user.full_name != BLOG_ID:
         return
     elif reply_from_user.full_name == BLOG_ID:
-        await reply_to_one_message(message, model, message.reply_to_message)        
+        await reply_to_one_message(message, model, message.reply_to_message)
         return
     elif message.reply_to_message.caption is not None:
         await reply_to_drawing(message, model, message.reply_to_message)
@@ -327,7 +332,7 @@ async def handle_ask_command_in_chat(message: types.Message, model: AsyncMotyaMo
         message.text = message.get_args()
         if not message.text:
             await message.reply("на что вы хотите чтобы я ответил? 🤓")
-            return 
+            return
     await reply_to_question_in_chat(message, model, state)
 
 
@@ -337,7 +342,7 @@ async def basic_error(update: types.Update, error_msg: str):
     except Exception as e:
         logger.error(e)
     finally:
-        return True 
+        return True
 
 
 @dp.errors_handler(exception=ImageGenerationError)
@@ -359,5 +364,5 @@ async def retry_limit_error(update: types.Update, error):
 if __name__ == "__main__":
     from dotenv import load_dotenv
     load_dotenv()
-    
+
     bot_config_db.add_themes()
