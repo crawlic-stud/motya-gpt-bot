@@ -1,6 +1,7 @@
 version: "3"
 services:
   prod:
+    restart: always
     build:
       context: .
       dockerfile: ./Dockerfile
