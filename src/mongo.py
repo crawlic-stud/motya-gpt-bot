@@ -87,7 +87,7 @@ class UserConfigDb(MongoDatabase):
             resolution=Resolution(*conf.get("resolution", [])),
             style=conf.get("style", default_config.style),
         )
-    
+
 
 class NewsHistoryDb(MongoDatabase):
     def add_article_url(self, url: str) -> None:
@@ -97,4 +97,3 @@ class NewsHistoryDb(MongoDatabase):
 
     def get_excluded_urls(self) -> list[str]:
         return [article["url"] for article in self.get_all()]
-    

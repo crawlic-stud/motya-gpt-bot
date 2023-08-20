@@ -2,8 +2,10 @@ import os
 import asyncio
 import io
 import argparse
+from pathlib import Path
 import random
 import logging
+import shutil
 
 from aiogram import types, Bot, Dispatcher
 from aiogram.contrib.fsm_storage.mongo import MongoStorage
@@ -19,7 +21,7 @@ from mongo import BotConfigDb, UserConfigDb, NewsHistoryDb
 from image_gen import ImageGenerator, ImageGenerationError
 from news_parser import NewsParser
 from models import Prompt, Resolution, CappedList
-from utils import create_media
+from utils import create_media, create_gif
 
 
 THROTTLE_RATE_IMAGE = 5
@@ -27,6 +29,8 @@ CHAT_HISTORY_SIZE = 10
 THROTTLE_RATE_MESSAGE = 1
 MAX_IMAGE_SIZE = 1024
 MAX_CAPTION_SIZE = 1024
+GIF_MAX_FRAMES = 24
+MAX_GIF_SIZE = 1024
 BLOG_ID = "Telegram"
 GROUP_NAME = "@motya_blog"
 DEFAULT_PROMPT = Prompt("")
@@ -36,6 +40,8 @@ TOKEN = os.getenv("TG_TOKEN")
 ADMIN_ID = int(os.getenv("ADMIN_ID"))
 MONGO_URL = os.getenv("MONGO_URL")
 DB_NAME = "motya_gpt"
+IMG_PATH = Path.cwd() / "images"
+DRAW_HELP = "чтобы нарисовать что-то, нужно отправить вместе с командой {command} то, что хочешь нарисовать 😉"
 
 bot = Bot(TOKEN, parse_mode="HTML")
 dp = Dispatcher(bot, storage=MongoStorage(uri=MONGO_URL, db_name=DB_NAME))
@@ -95,6 +101,7 @@ async def on_startup(dp: Dispatcher):
         types.BotCommand("start", "Поприветствовать Мотю"),
         types.BotCommand("draw", "Нарисовать картинку по запросу"),
         types.BotCommand("ask", "Задать вопрос боту (для чатов)"),
+        types.BotCommand("gif", "Нарисовать анимацию по запросу"),
         types.BotCommand("clear", "Очистить историю сообщений с ботом"),
         types.BotCommand("style", "Поставить стандартный стиль картинок"),
         types.BotCommand("res", "Поставить стандартное разрешение картинок"),
@@ -179,6 +186,44 @@ async def set_style(message: types.Message):
     await message.reply("поменял стандартный стиль 🥰")
 
 
+@dp.message_handler(commands=["gif"])
+@dp.throttled(on_message_spam, rate=THROTTLE_RATE_MESSAGE)
+async def get_gif(message: types.Message, model: AsyncMotyaModel):
+    prompt = parse_args(message.get_args())
+    if not prompt:
+        await message.reply(DRAW_HELP.format(command="/gif"))
+        return
+
+    user_conf = user_config_db.get_user_config(message.from_id)
+    if prompt.is_default():
+        prompt = Prompt(prompt.text, user_conf.style, user_conf.resolution)
+
+    if prompt.frames_count > GIF_MAX_FRAMES:
+        await message.reply(f"нельзя больше {GIF_MAX_FRAMES} кадров!")
+    prompt.resolution = prompt.resolution.get_scaled(MAX_GIF_SIZE)
+
+    user_config_db.set_last_image(message.from_id, prompt.description)
+    temp_msg = await message.answer("рисую картинки ✏️🐾 ... займет 5-7 минуток")
+
+    save_path = IMG_PATH / str(message.from_id) / str(message.message_id)
+    try:
+        for i in range(prompt.frames_count):
+            image_bytes = await model.image_gen.get_images([prompt])
+            save_path.mkdir(exist_ok=True, parents=True)
+            file_path = save_path / f"{message.from_id}_{str(i)}.png"
+            file_path.write_bytes(image_bytes[0])
+
+        gif_bytes = create_gif(save_path, img_extension=".png", duration=250)
+        file_ = types.InputFile(io.BytesIO(gif_bytes), f"{prompt.text}.gif")
+        await message.reply_animation(file_, caption=IMAGE_CAPTION,
+                                      width=prompt.resolution.width,
+                                      height=prompt.resolution.height)
+    finally:
+        shutil.rmtree(save_path)
+
+    await temp_msg.delete()
+
+
 @dp.message_handler(commands=["res"])
 @dp.throttled(on_message_spam, rate=THROTTLE_RATE_MESSAGE)
 async def set_style(message: types.Message):
@@ -197,12 +242,7 @@ async def set_style(message: types.Message):
 async def send_image(message: types.Message, model: AsyncMotyaModel):
     prompt = parse_args(message.get_args())
     if not prompt:
-        msg = await message.answer("думаю 🐾 ...")
-        answer = await model.answer(
-            "напиши: чтобы нарисовать что-то, нужно отправить вместе с командой /draw то, что хочешь нарисовать"
-        )
-        await message.reply(answer)
-        await msg.delete()
+        msg = await message.reply(DRAW_HELP.format(command="/draw"))
         return
 
     user_conf = user_config_db.get_user_config(message.from_id)

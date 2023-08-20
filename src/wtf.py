@@ -7,6 +7,7 @@ from bot import bot, bot_config_db
 from model.async_model import AsyncMotyaModel, THEME_MODEL, PIC_MODEL 
 
 
+
 async def recreate():
     motya = await AsyncMotyaModel.create()
     helper_p = bot_config_db.get_helper_prompt()
@@ -24,4 +25,5 @@ async def recreate():
 
 if __name__ == "__main__":
     load_dotenv()
-    asyncio.run(recreate())
+    # asyncio.run(recreate())
+    

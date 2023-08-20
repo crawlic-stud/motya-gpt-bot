@@ -9,3 +9,4 @@ motor
 pytest
 pytest-asyncio
 bs4
+pillow

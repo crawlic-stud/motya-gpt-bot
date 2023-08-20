@@ -8,6 +8,7 @@ import pytest
 from model.async_model import AsyncMotyaModel
 from mongo import BotConfigDb
 from models import CappedList
+from tasks.base import Task
 
 
 load_dotenv()
@@ -38,7 +39,7 @@ def test_chat_queue():
             queue) <= max_store, f"Queue size must not exceed {max_store} elements"
 
 
-if __name__ == "__main__":
-    # test_getting_themes()
-    # asyncio.run(test_creates_random_post())
-    test_chat_queue()
+@pytest.mark.asyncio
+async def test_create_task():
+    motya = await AsyncMotyaModel.create()
+    

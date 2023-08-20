@@ -1,10 +1,8 @@
 from typing import Optional, NamedTuple
-from dataclasses import dataclass
 
-import aioschedule
 from aiogram import types
 
-from ..model.async_model import AsyncMotyaModel, Prompt, Post
+from ..model.async_model import AsyncMotyaModel, Prompt
 from ..utils import create_media
 
 
@@ -29,11 +27,13 @@ class Task:
         what_to_do: str,
         post_time: str,
         pictures_info: Optional[list[Prompt]] = None,
+        inspirations: Optional[list[str]] = None
     ) -> None:
         self.model = model
         self.what_to_do = what_to_do
         self.post_time = post_time
         self.pic_info = pictures_info or []
+        self.inspirations = inspirations or []
 
     async def _get_text(self) -> str:
         answer = await self.model.answer(self.what_to_do)
