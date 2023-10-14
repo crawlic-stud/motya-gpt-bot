@@ -11,8 +11,4 @@ if __name__ == "__main__":
 
     from bot import dp, on_startup
 
-    executor.start_polling(
-        dispatcher=dp,
-        on_startup=on_startup,
-        skip_updates=True
-    )
+    executor.start_polling(dispatcher=dp, on_startup=on_startup, skip_updates=True)

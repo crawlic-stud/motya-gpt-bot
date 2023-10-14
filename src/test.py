@@ -5,7 +5,7 @@ from string import ascii_letters
 from dotenv import load_dotenv
 import pytest
 
-from model.async_model import AsyncMotyaModel
+from model.mindsdb_model import MindsDbMotyaModel
 from mongo import BotConfigDb
 from models import CappedList
 from tasks.base import Task
@@ -22,7 +22,7 @@ def test_getting_themes():
 
 @pytest.mark.asyncio
 async def test_creates_random_post():
-    motya = await AsyncMotyaModel.create()
+    motya = await MindsDbMotyaModel.create()
     themes = config_db.get_themes()
     post = await motya.create_random_post(themes)
     assert isinstance(post, str), "Must be a string!"
@@ -35,11 +35,11 @@ def test_chat_queue():
         msg = "".join(random.choices(ascii_letters, k=10))
         queue.add_message(msg)
         print(queue)
-        assert len(
-            queue) <= max_store, f"Queue size must not exceed {max_store} elements"
+        assert (
+            len(queue) <= max_store
+        ), f"Queue size must not exceed {max_store} elements"
 
 
 @pytest.mark.asyncio
 async def test_create_task():
-    motya = await AsyncMotyaModel.create()
-    
+    motya = await MindsDbMotyaModel.create()

@@ -26,15 +26,9 @@ class Resolution(NamedTuple):
 
     def get_scaled(self, size: int) -> "Resolution":
         if self.width == max(self):
-            return Resolution(
-                width=size,
-                height=int(self.height * size / self.width)
-            )
+            return Resolution(width=size, height=int(self.height * size / self.width))
         elif self.height == max(self):
-            return Resolution(
-                height=size,
-                width=int(self.width * size / self.height)
-            )
+            return Resolution(height=size, width=int(self.width * size / self.height))
         return self
 
 
@@ -64,7 +58,7 @@ class CappedList(list):
         super().__init__()
         self.max_store = max_store
 
-        messages = messages if messages is None else []
+        messages = messages if messages is not None else []
         for msg in messages:
             self.add_message(msg)
 

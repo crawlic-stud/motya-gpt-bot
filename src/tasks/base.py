@@ -2,7 +2,7 @@ from typing import Optional, NamedTuple
 
 from aiogram import types
 
-from ..model.async_model import AsyncMotyaModel, Prompt
+from ..model.mindsdb_model import MindsDbMotyaModel, Prompt
 from ..utils import create_media
 
 
@@ -23,11 +23,11 @@ class TelegramPost(NamedTuple):
 class Task:
     def __init__(
         self,
-        model: AsyncMotyaModel,
+        model: MindsDbMotyaModel,
         what_to_do: str,
         post_time: str,
         pictures_info: Optional[list[Prompt]] = None,
-        inspirations: Optional[list[str]] = None
+        inspirations: Optional[list[str]] = None,
     ) -> None:
         self.model = model
         self.what_to_do = what_to_do

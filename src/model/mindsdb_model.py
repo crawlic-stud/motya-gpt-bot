@@ -1,3 +1,4 @@
+import warnings
 import aiomysql
 from aiomysql.utils import _PoolContextManager
 from pymysql.err import ProgrammingError, OperationalError
@@ -11,17 +12,10 @@ import asyncio
 from image_gen import ImageGenerator
 from news_parser import NewsParser
 from models import Prompt, Post
+from .base import *
 
 
-logger = logging.getLogger("model")
-MAX_FAILS = 1
-MAX_TOKENS = 8192
-MAX_HISTORY_LENGTH = MAX_TOKENS // 2
-MAIN_MODEL = "mindsdb.motya_model"
-THEME_MODEL = "mindsdb.motya_helper"
-PIC_MODEL = "mindsdb.pic_helper"
-MODELS = [MAIN_MODEL, THEME_MODEL, PIC_MODEL]
-CONN_ERR_MSG = "не могу сейчас ответить, я в отпуске 😓 используй команду /draw, чтобы порисовать!"
+logger = logging.getLogger("mindsdb_model")
 
 
 def retry_policy(info: RetryInfo):
@@ -40,9 +34,7 @@ async def _get_pool() -> _PoolContextManager | None:
         if user is None or password is None:
             raise ValueError("No user or password provided for MindsDB")
         pool = await aiomysql.create_pool(
-            host="cloud.mindsdb.com",
-            user=user,
-            password=password
+            host="cloud.mindsdb.com", user=user, password=password
         )
         logger.info("Connection to MindsDB - SUCCESS")
         return pool
@@ -51,25 +43,29 @@ async def _get_pool() -> _PoolContextManager | None:
         return
 
 
-class AsyncMotyaModel:
+class MindsDbMotyaModel(AsyncChatModel):
     """Class to connect to my Mindsdb model"""
+
     def __init__(self) -> None:
+        warnings.warn(
+            "This model is deprecated and doesn't work without OpenAI API key. Use g4f model instead."
+        )
         self.pool: _PoolContextManager | None = None
         self.image_gen: ImageGenerator | None = None
         self.news_parser: NewsParser | None = None
 
     @classmethod
     async def create(
-        cls, 
+        cls,
         image_gen: ImageGenerator | None = None,
-        news_parser: NewsParser | None = None 
+        news_parser: NewsParser | None = None,
     ):
         instance = cls()
         instance.pool = await _get_pool()
         instance.image_gen = image_gen
         instance.news_parser = news_parser
         return instance
-    
+
     def __del__(self):
         self.pool.close()
 
@@ -84,7 +80,7 @@ class AsyncMotyaModel:
     async def answer(self, text: str, model_name: str = MAIN_MODEL) -> str:
         if self.pool is None:
             return CONN_ERR_MSG
-        text = text.replace('"', '')
+        text = text.replace('"', "")
         command = f'SELECT response from {model_name} WHERE text="{text}";'
         result = await self._execute(command)
         return result[0]
@@ -95,10 +91,12 @@ class AsyncMotyaModel:
         if len(dialog) < MAX_HISTORY_LENGTH:
             return dialog
         if step >= max_steps:
-           return "" 
+            return ""
         return self.prepare_dialog(history[step:], step + 1, max_steps)
 
-    async def answer_with_history(self, text: str, history: list[str], model_name: str = MAIN_MODEL) -> str:
+    async def answer_with_history(
+        self, text: str, history: list[str], model_name: str = MAIN_MODEL
+    ) -> str:
         dialog = self.prepare_dialog(history, 1, len(history))
         if dialog:
             prompt = f"Ответь на сообщение, учитывая контекст диалога. Сообщение: {text}. Диалог:\n'''\n{dialog}'''"
@@ -120,15 +118,17 @@ class AsyncMotyaModel:
         inspiration = random.choice(await self.get_inspirations(theme)).strip()
         return inspiration
 
-    async def get_random_article_description(self, excluded_links: list[str]) -> tuple[str, str]:
+    async def get_random_article_description(
+        self, excluded_links: list[str]
+    ) -> tuple[str, str]:
         logger.info(f"Getting article from {self.news_parser.BASE_URL}")
         link = await self.news_parser.get_latest_link(excluded_links)
         logger.info(f"Article URL: {link}")
 
         article_description = await self.answer(
-            f"опиши новость в позитивной манере по ссылке: {link}. " 
-            f"в самом начале укажи заголовок статьи в формате: <b>заголовок</b>. " 
-            f"напиши что это ежедневная рубрика позитивная новость дня. " 
+            f"опиши новость в позитивной манере по ссылке: {link}. "
+            f"в самом начале укажи заголовок статьи в формате: <b>заголовок</b>. "
+            f"напиши что это ежедневная рубрика позитивная новость дня. "
             f"напиши 3 ключевых факта из статьи, которые тебя зацепили. "
             f"не надо писать ничего про себя, только про новость. "
             f"в конце добавь ссылку на новость в формате: <a href='ссылка'>тут</a>."
@@ -141,9 +141,10 @@ class AsyncMotyaModel:
             logger.info(f"Dropped table: {model_name}")
         except ProgrammingError as e:
             logger.error("Deletion failed:", e)
-        
+
         try:
-            await self._execute(f"""
+            await self._execute(
+                f"""
                 CREATE MODEL {model_name}
                 PREDICT response
                 USING
@@ -163,10 +164,7 @@ class AsyncMotyaModel:
         return await self.answer(f"напиши короткий пост про: {inspiration}")
 
     async def create_random_post_with_images(
-        self, 
-        themes: list[str], 
-        images_amount: int, 
-        image_styles: list[str]
+        self, themes: list[str], images_amount: int, image_styles: list[str]
     ) -> Post:
         inspiration = await self.get_random_inspiration(themes)
         logger.info(f"GENERATING POST WITH IMAGES: {inspiration}")
@@ -181,21 +179,23 @@ class AsyncMotyaModel:
         style = random.choice([f"{item}, no text" for item in image_styles])
         prompts = [Prompt(insp, style) for insp in inspirations_for_image]
 
-        logger.info(f"GENERATING IMAGES ({images_amount}): {', '.join(inspirations_for_image)}")
+        logger.info(
+            f"GENERATING IMAGES ({images_amount}): {', '.join(inspirations_for_image)}"
+        )
         images = await self.image_gen.get_images(prompts)
-        
+
         return Post(text, images)
 
 
 async def main():
-    motya = await AsyncMotyaModel.create()
+    motya = await MindsDbMotyaModel.create()
     # print(await motya.create_random_post(["игрушки"]))
     history = [
-      "write a 700 words essay on the second topic",
-      "write a 1000 words essay on the second topic",
-      "write it in english",
-      "write some topics related to the theme: \"changing fashions\". make it related to it industry or computer science university. write in english",
-      "hi! 😊 here are some topics related to \"changing fashions\" in the it industry and computer science university:\n\n1. the evolution of programming languages: from punch cards to artificial intelligence 🤖\n2. the rise of wearable technology: smartwatches, fitness trackers, and vr headsets 🕶️\n3. the impact of social media on the fashion industry: influencers, online shopping, and virtual fashion shows 💻\n4. the role of big data and analytics in predicting fashion trends 📊\n5. sustainable fashion and technology: eco-friendly materials and 3d printing 🌿\n\nhope you find these topics interesting! have fun learning and exploring new things at school! 🏫 don't forget to share your discoveries with your friends and family! 👨‍👩‍👧‍👦💕"
+        "write a 700 words essay on the second topic",
+        "write a 1000 words essay on the second topic",
+        "write it in english",
+        'write some topics related to the theme: "changing fashions". make it related to it industry or computer science university. write in english',
+        'hi! 😊 here are some topics related to "changing fashions" in the it industry and computer science university:\n\n1. the evolution of programming languages: from punch cards to artificial intelligence 🤖\n2. the rise of wearable technology: smartwatches, fitness trackers, and vr headsets 🕶️\n3. the impact of social media on the fashion industry: influencers, online shopping, and virtual fashion shows 💻\n4. the role of big data and analytics in predicting fashion trends 📊\n5. sustainable fashion and technology: eco-friendly materials and 3d printing 🌿\n\nhope you find these topics interesting! have fun learning and exploring new things at school! 🏫 don\'t forget to share your discoveries with your friends and family! 👨‍👩‍👧‍👦💕',
     ]
     dialog = motya.prepare_dialog(history, 1, len(history))
     prompt = f"Ответь на сообщение, учитывая историю диалога. Сообщение: мотя привет. Диалог: {dialog}"
@@ -205,6 +205,7 @@ async def main():
 
 if __name__ == "__main__":
     from dotenv import load_dotenv
+
     load_dotenv()
     logging.basicConfig(level=logging.INFO)
     asyncio.run(main())

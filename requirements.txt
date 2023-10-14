@@ -1,10 +1,9 @@
 python-dotenv
 aioretry
-aiomysql
-aiogram
+# aiomysql
+g4f
+aiogram==2.*
 aioschedule
-pymongo
-pymongo[srv]
 motor
 pytest
 pytest-asyncio

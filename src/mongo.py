@@ -21,8 +21,7 @@ class BotConfigDb(MongoDatabase):
 
     def add_themes(self, themes: list[str]) -> None:
         self.client.update_one(
-            {"_id": "themes"},
-            {"$addToSet": {"themes": {"$each": themes}}}
+            {"_id": "themes"}, {"$addToSet": {"themes": {"$each": themes}}}
         )
 
     def get_image_styles(self) -> None | list[str]:
@@ -31,8 +30,7 @@ class BotConfigDb(MongoDatabase):
 
     def add_image_styles(self, styles: list[str]) -> None:
         self.client.update_one(
-            {"_id": "styles"},
-            {"$addToSet": {"styles": {"$each": styles}}}
+            {"_id": "styles"}, {"$addToSet": {"styles": {"$each": styles}}}
         )
 
     def get_main_prompt(self) -> None | str:
@@ -44,40 +42,44 @@ class BotConfigDb(MongoDatabase):
         return result.get("prompt")
 
     def set_main_prompt(self, prompt: str) -> None:
-        self.client.update_one({"_id": "main_prompt"}, {
-                               "$set": {"prompt": prompt}}, upsert=True)
+        self.client.update_one(
+            {"_id": "main_prompt"}, {"$set": {"prompt": prompt}}, upsert=True
+        )
 
     def set_helper_prompt(self, prompt: str) -> None:
-        self.client.update_one({"_id": "helper_prompt"}, {
-                               "$set": {"prompt": prompt}}, upsert=True)
+        self.client.update_one(
+            {"_id": "helper_prompt"}, {"$set": {"prompt": prompt}}, upsert=True
+        )
 
 
 class UserConfigDb(MongoDatabase):
     def set_resolution(self, user_id: int, resolution: Resolution) -> None:
         self.client.update_one(
             {"user_id": user_id},
-            {"$set": {
-                "resolution": list(resolution),
-            }},
-            upsert=True
+            {
+                "$set": {
+                    "resolution": list(resolution),
+                }
+            },
+            upsert=True,
         )
 
     def set_style(self, user_id: int, style: str) -> None:
         self.client.update_one(
             {"user_id": user_id},
-            {"$set": {
-                "style": style,
-            }},
-            upsert=True
+            {
+                "$set": {
+                    "style": style,
+                }
+            },
+            upsert=True,
         )
 
     def set_last_image(self, user_id: int, image_description: str) -> None:
         self.client.update_one(
             {"user_id": user_id},
-            {"$set": {
-                "last_image": image_description
-            }},
-            upsert=True
+            {"$set": {"last_image": image_description}},
+            upsert=True,
         )
 
     def get_user_config(self, user_id: int) -> UserConfig:
@@ -91,9 +93,7 @@ class UserConfigDb(MongoDatabase):
 
 class NewsHistoryDb(MongoDatabase):
     def add_article_url(self, url: str) -> None:
-        self.client.insert_one(
-            {"url": url}
-        )
+        self.client.insert_one({"url": url})
 
     def get_excluded_urls(self) -> list[str]:
         return [article["url"] for article in self.get_all()]

@@ -28,15 +28,14 @@ class NewsParser:
         async with aiohttp.ClientSession(headers=self.headers) as session:
             async with session.get(self.BASE_URL) as response:
                 if response.status != 200:
-                    raise NewsParserError(
-                        f"Can not connect to {self.BASE_URL}")
+                    raise NewsParserError(f"Can not connect to {self.BASE_URL}")
 
                 html = await response.text()
                 soup = BeautifulSoup(html, "html.parser")
 
                 a_tags = soup.select(".post-title a")
                 times = soup.select(".entry-date")
-                
+
                 hrefs = []
                 for t in times:
                     href = t.parent["href"]
@@ -50,6 +49,4 @@ class NewsParser:
 
 
 if __name__ == "__main__":
-    print(
-        asyncio.run(NewsParser().get_latest_link([]))
-    )
+    print(asyncio.run(NewsParser().get_latest_link([])))

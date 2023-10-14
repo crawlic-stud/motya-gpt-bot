@@ -7,8 +7,7 @@ from PIL import Image
 
 def create_media(images: list[bytes], caption: str = None) -> types.MediaGroup:
     media = types.MediaGroup()
-    media.attach_photo(types.InputFile(
-        io.BytesIO((images[0])), "image.png"), caption)
+    media.attach_photo(types.InputFile(io.BytesIO((images[0])), "image.png"), caption)
     for image in images[1:]:
         media.attach_photo(types.InputFile(io.BytesIO(image), "image.png"))
     return media
@@ -20,10 +19,24 @@ def create_gif(path: Path, img_extension: str = ".png", duration: int = 100) -> 
         frame = Image.open(image)
         gif_frames.append(frame)
     buffer = io.BytesIO()
-    gif_frames[0].save(buffer, format="GIF", save_all=True,
-                       append_images=gif_frames[1:], duration=duration,
-                       loop=0)
+    gif_frames[0].save(
+        buffer,
+        format="GIF",
+        save_all=True,
+        append_images=gif_frames[1:],
+        duration=duration,
+        loop=0,
+    )
     return buffer.getvalue()
+
+
+def create_history_chunk(
+    user_message: str, assistant_message: str
+) -> list[dict[str, str]]:
+    return [
+        {"role": "user", "content": user_message},
+        {"role": "assistant", "content": assistant_message},
+    ]
 
 
 if __name__ == "__main__":
