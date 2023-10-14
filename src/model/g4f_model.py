@@ -63,7 +63,9 @@ class GPT4FreeModel(AsyncChatModel):
         ]
 
     async def _answer(self, messages: list[dict[str, str]]) -> str:
-        message = await g4f.ChatCompletion.create_async(model=self.model, messages=messages)
+        message = await g4f.ChatCompletion.create_async(
+            model=self.model, messages=messages
+        )
         return message
 
     @retry(retry_policy=retry_policy)
